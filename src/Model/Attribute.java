@@ -1,0 +1,21 @@
+package Model;
+
+public enum Attribute {
+
+    ID,
+    DELIMITER,
+    NUMBER,
+    LOGICAL_OP,
+    ARIT_OP,
+    REL_OP,
+    RESERVED_WORD,
+    COMMENT,
+    STRING,
+    BAD_STRING,
+    BAD_LOGICAL_OP,
+    BAD_RELATIONAL_OP,
+    BAD_ID_FORMATION,
+    BAD_NUMBER_FORMATION,
+    BAD_FORMATION,
+    COMMENT_WITHOUT_END;
+}
