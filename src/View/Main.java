@@ -8,7 +8,7 @@ import java.util.ArrayList;
 public class Main {
 
     private static final LexicalAnalyzer lexical = new LexicalAnalyzer();
-    private static final SyntaticAnalyzer syntatic = new SyntaticAnalyzer();
+    private static SyntaticAnalyzer syntatic = new SyntaticAnalyzer();
 
     public static void main(String[] args) throws IOException {
         /* Try to open 'teste' directory.
@@ -23,8 +23,9 @@ public class Main {
                     ArrayList<ArrayList<Token>> ret = lexical.start(files);
                     ArrayList<Token> tokens = ret.get(0);
                     ArrayList<Token> errors = ret.get(1);
-
-                    lexical.writeDataOut(files.getName());
+                    if(errors.isEmpty()){
+                        
+                    }
                 }
             }
         }
