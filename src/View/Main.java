@@ -24,8 +24,9 @@ public class Main {
                     ArrayList<Token> tokens = ret.get(0);
                     ArrayList<Token> errors = ret.get(1);
                     if(errors.isEmpty()){
-                        
+                        syntatic.analyze(tokens);
                     }
+                    lexical.clear();
                 }
             }
         }

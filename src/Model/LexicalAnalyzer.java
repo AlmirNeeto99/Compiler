@@ -683,7 +683,6 @@ public class LexicalAnalyzer {
                 }
             }
         }
-        clear();
     }
 
     public void clear() {

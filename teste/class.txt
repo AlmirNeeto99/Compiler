@@ -1,0 +1,2 @@
+class teste extends test{
+class teste extends test{}
