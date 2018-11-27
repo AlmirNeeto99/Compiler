@@ -142,6 +142,7 @@ public class LexicalAnalyzer {
                         state = false;
                     } else {
                         lexeme = lexeme.trim();
+                        lexeme = "\""+lexeme+"\"";
                         changes.setAttr_name(Attribute.STRING);
                         changes.setLexeme(lexeme);
                         isString = false;

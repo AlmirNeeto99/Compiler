@@ -22,7 +22,9 @@ public class SyntaticAnalyzer {
         constantDeclaration();
         classDeclaration();
         moreClasses();
-        System.out.println(pos);
+        if(pos == tokens.size()){
+            System.out.println("Success");
+        }
     }
 
     private void constantDeclaration() {
@@ -57,9 +59,7 @@ public class SyntaticAnalyzer {
             getToken();
             classHeritage();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) {
-                System.out.println(token);
                 getToken();
-                System.out.println("wqkjekqwejhwq      "+token);
                 classBody();
                 if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("}")) {
                     getToken();
@@ -91,7 +91,7 @@ public class SyntaticAnalyzer {
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) {
                 getToken();
-                constants();
+                variable();
                 if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("}")) {
                     getToken();
                 }
@@ -609,16 +609,19 @@ public class SyntaticAnalyzer {
             getToken();
             name();
         }
+        else if(token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(";")){
+            getToken();
+        }
     }
 
     private void parameterDeclaration() {
-        if (verifyType()) {
+        if (verifyType() || token.getAttr_name() == Attribute.ID) {
             parameterDeclaration2();
         }
     }
 
     private void parameterDeclaration2() {
-        if (verifyType()) {
+        if (verifyType()|| token.getAttr_name() == Attribute.ID) {
             getToken();
             if (token.getAttr_name() == Attribute.ID) {
                 getToken();
@@ -639,7 +642,7 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.ID) {
             getToken();
             arrayVerification();
-        } else {
+        } else if(token.getAttr_name() == Attribute.STRING || token.getAttr_name() == Attribute.NUMBER || token.getLexeme().equals("true") || token.getLexeme().equals("false")){
             value();
         }
     }
@@ -682,6 +685,9 @@ public class SyntaticAnalyzer {
         if (verifyType()) {
             getToken();
         }
+        else if(token.getAttr_name() == Attribute.ID){
+            getToken();
+        }
     }
 
     private boolean hasTokens() {
@@ -698,6 +704,7 @@ public class SyntaticAnalyzer {
     }
 
     private void getToken() {
+        System.out.println(token);
         if (hasTokens()) {
             token = tokens.get(pos++);
         }
