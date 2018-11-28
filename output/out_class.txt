@@ -18,15 +18,9 @@
 <RESERVED_WORD, return, Line: 4>
 <ID, a, Line: 4>
 <DELIMITER, ;, Line: 4>
-<RESERVED_WORD, while, Line: 5>
-<DELIMITER, (, Line: 5>
-<RESERVED_WORD, true, Line: 5>
-<DELIMITER, ), Line: 5>
-<DELIMITER, {, Line: 5>
+<DELIMITER, }, Line: 5>
 <DELIMITER, }, Line: 6>
 <DELIMITER, }, Line: 7>
-<DELIMITER, }, Line: 8>
-<DELIMITER, }, Line: 9>
 
 
 SUCCESS ON PARSING FILE!

@@ -2,8 +2,6 @@ class a{
     method int a(){
         if(c>j)then{
             return a;
-            while(true){
-            }
         }
     }
 }

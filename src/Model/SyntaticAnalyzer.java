@@ -1,5 +1,6 @@
 package Model;
 
+import Exceptions.*;
 import java.util.ArrayList;
 
 public class SyntaticAnalyzer {
@@ -15,19 +16,23 @@ public class SyntaticAnalyzer {
     public void analyze(ArrayList<Token> tokens) {
         this.tokens = tokens;
         this.token = tokens.get(pos++);
-        start();
+        try {
+            start();
+        } catch (EOFException ex) {
+            System.out.println(ex.getMessage());;
+        }
     }
 
-    public void start() {
+    public void start() throws EOFException {
         constantDeclaration();
         classDeclaration();
         moreClasses();
-        if (pos == tokens.size()) {
+        if (this.token == null) {
             System.out.println("Success");
         }
     }
 
-    private void constantDeclaration() {
+    private void constantDeclaration() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("const")) {
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) {
@@ -40,21 +45,21 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void classDeclaration() {
+    private void classDeclaration() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("class")) {
             getToken();
             classIdentification();
         }
     }
 
-    private void moreClasses() {
+    private void moreClasses() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("class")) {
             classDeclaration();
             moreClasses();
         }
     }
 
-    private void classIdentification() {
+    private void classIdentification() throws EOFException {
         if (token.getAttr_name() == Attribute.ID) {
             getToken();
             classHeritage();
@@ -68,7 +73,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void classHeritage() {
+    private void classHeritage() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("extends")) {
             getToken();
             if (token.getAttr_name() == Attribute.ID) {
@@ -77,16 +82,16 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void classBody() {
+    private void classBody() throws EOFException {
         classAtributes();
         methods();
     }
 
-    private void classAtributes() {
+    private void classAtributes() throws EOFException {
         variableDeclaration();
     }
 
-    private void variableDeclaration() {
+    private void variableDeclaration() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("variables")) {
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) {
@@ -99,7 +104,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void constants() {
+    private void constants() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("float") || token.getLexeme().equals("string") || token.getLexeme().equals("bool") || token.getLexeme().equals("int") || token.getLexeme().equals("void"))) {
             getToken();
             constantAttribution();
@@ -107,7 +112,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void moreConstants() {
+    private void moreConstants() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
             getToken();
             constantAttribution();
@@ -118,13 +123,13 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void newDeclaration() {
+    private void newDeclaration() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("float") || token.getLexeme().equals("string") || token.getLexeme().equals("bool") || token.getLexeme().equals("int") || token.getLexeme().equals("void"))) {
             constants();
         }
     }
 
-    private void constantAttribution() {
+    private void constantAttribution() throws EOFException {
         if (token.getAttr_name() == Attribute.ID) {
             getToken();
             if (token.getLexeme().equals("=")) {
@@ -134,19 +139,19 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void value() {
+    private void value() throws EOFException {
         if (token.getAttr_name() == Attribute.STRING || token.getAttr_name() == Attribute.NUMBER || token.getLexeme().equals("true") || token.getLexeme().equals("false")) {
             getToken();
         }
     }
 
-    private void methods() {
+    private void methods() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("method")) {
             methodDeclaration();
         }
     }
 
-    private void methodDeclaration() {
+    private void methodDeclaration() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("method")) {
             getToken();
             type();
@@ -172,7 +177,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void commands() {
+    private void commands() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("if")) {
             ifStatement();
             commands();
@@ -205,7 +210,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void attribution() {
+    private void attribution() throws EOFException {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
             increment();
             if (token.getAttr_name() == Attribute.ID) {
@@ -221,7 +226,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void verif() {
+    private void verif() throws EOFException {
         if (token.getAttr_name() == Attribute.REL_OP && token.getLexeme().equals("=")) {
             normalAttribution2();
         } else if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
@@ -229,7 +234,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void complement() {
+    private void complement() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
             getToken();
             parameter();
@@ -239,7 +244,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void parameter() {
+    private void parameter() throws EOFException {
         if (token.getAttr_name() == Attribute.STRING) {
             getToken();
             moreParam();
@@ -261,20 +266,20 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void parameter2() {
+    private void parameter2() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
             complement();
         }
     }
 
-    private void moreParam() {
+    private void moreParam() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
             getToken();
             obrigatoryParam();
         }
     }
 
-    private void obrigatoryParam() {
+    private void obrigatoryParam() throws EOFException {
         if (token.getAttr_name() == Attribute.STRING) {
             getToken();
             moreParam();
@@ -296,7 +301,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void normalAttribution2() {
+    private void normalAttribution2() throws EOFException {
         if (token.getAttr_name() == Attribute.REL_OP && token.getLexeme().equals("=")) {
             getToken();
             normalAttribution3();
@@ -305,7 +310,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void normalAttribution3() {
+    private void normalAttribution3() throws EOFException {
         if (token.getAttr_name() == Attribute.STRING) {
             getToken();
         } else if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("true") || token.getLexeme().equals("false"))) {
@@ -321,12 +326,12 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void expression() {
+    private void expression() throws EOFException {
         addExp();
         relationalExp();
     }
 
-    private void relationalExp() {
+    private void relationalExp() throws EOFException {
         if (isRelationalOperator()) {
             getToken();
             addExp();
@@ -336,38 +341,38 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void logicalExp() {
+    private void logicalExp() throws EOFException {
         if (token.getAttr_name() == Attribute.LOGICAL_OP && (token.getLexeme().equals("||") || token.getLexeme().equals("&&"))) {
             getToken();
             expression();
         }
     }
 
-    private void addExp() {
+    private void addExp() throws EOFException {
         multExp();
         plusOrMinus();
     }
 
-    private void plusOrMinus() {
+    private void plusOrMinus() throws EOFException {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("+") || token.getLexeme().equals("-"))) {
             getToken();
             addExp();
         }
     }
 
-    private void timesOrDivide() {
+    private void timesOrDivide() throws EOFException {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("*") || token.getLexeme().equals("/"))) {
             getToken();
             multExp();
         }
     }
 
-    private void multExp() {
+    private void multExp() throws EOFException {
         negExp();
         timesOrDivide();
     }
 
-    private void negExp() {
+    private void negExp() throws EOFException {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("-") || token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
             getToken();
             expValue();
@@ -386,7 +391,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void expValue() {
+    private void expValue() throws EOFException {
         if (token.getAttr_name() == Attribute.NUMBER) {
             getToken();
         } else if (token.getAttr_name() == Attribute.ID) {
@@ -405,19 +410,19 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void incrementAndDecrement() {
+    private void incrementAndDecrement() throws EOFException {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
             getToken();
         }
     }
 
-    private void increment() {
+    private void increment() throws EOFException {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
             getToken();
         }
     }
 
-    private void writeStatement() {
+    private void writeStatement() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("write")) {
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
@@ -433,7 +438,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void writing1() {
+    private void writing1() throws EOFException {
         if (token.getAttr_name() == Attribute.ID) {
             getToken();
             arrayVerification();
@@ -445,14 +450,14 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void moreWritings() {
+    private void moreWritings() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
             getToken();
             writing1();
         }
     }
 
-    private void readStatement() {
+    private void readStatement() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("read")) {
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
@@ -468,7 +473,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void reading1() {
+    private void reading1() throws EOFException {
         if (token.getAttr_name() == Attribute.ID) {
             getToken();
             arrayVerification();
@@ -477,14 +482,14 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void moreReadings() {
+    private void moreReadings() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
             getToken();
             reading1();
         }
     }
 
-    private void attribute() {
+    private void attribute() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(".")) {
             getToken();
             if (token.getAttr_name() == Attribute.ID) {
@@ -495,7 +500,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void whileStatement() {
+    private void whileStatement() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("while")) {
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
@@ -515,7 +520,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void ifStatement() {
+    private void ifStatement() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("if")) {
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
@@ -545,7 +550,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void elseStatement() {
+    private void elseStatement() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("else")) {
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) {
@@ -558,13 +563,13 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void moreMethods() {
+    private void moreMethods() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("method")) {
             methodDeclaration();
         }
     }
 
-    private void variablesDeclaration() {
+    private void variablesDeclaration() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("variables")) {
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) {
@@ -577,7 +582,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void variable() {
+    private void variable() throws EOFException {
         if (verifyType() || token.getAttr_name() == Attribute.ID) {
             getToken();
             name();
@@ -585,13 +590,13 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void moreVariables() {
+    private void moreVariables() throws EOFException {
         if (verifyType() || token.getAttr_name() == Attribute.ID) {
             variable();
         }
     }
 
-    private void name() {
+    private void name() throws EOFException {
         if (token.getAttr_name() == Attribute.ID) {
             getToken();
             arrayVerification();
@@ -599,7 +604,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void moreNames() {
+    private void moreNames() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
             getToken();
             name();
@@ -608,13 +613,13 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void parameterDeclaration() {
+    private void parameterDeclaration() throws EOFException {
         if (verifyType() || token.getAttr_name() == Attribute.ID) {
             parameterDeclaration2();
         }
     }
 
-    private void parameterDeclaration2() {
+    private void parameterDeclaration2() throws EOFException {
         if (verifyType() || token.getAttr_name() == Attribute.ID) {
             getToken();
             if (token.getAttr_name() == Attribute.ID) {
@@ -625,14 +630,14 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void return1() {
+    private void return1() throws EOFException {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("return")) {
             getToken();
             return2();
         }
     }
 
-    private void return2() {
+    private void return2() throws EOFException {
         if (token.getAttr_name() == Attribute.ID) {
             getToken();
             arrayVerification();
@@ -641,14 +646,14 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void moreParameters() {
+    private void moreParameters() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
             getToken();
             parameterDeclaration2();
         }
     }
 
-    private void arrayVerification() {
+    private void arrayVerification() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("[")) {
             getToken();
             arrayIndex();
@@ -659,23 +664,26 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void arrayIndex() {
+    private void arrayIndex() throws EOFException {
         if (token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID) {
             getToken();
         }
     }
 
-    private void doubleArray() {
+    private void doubleArray() throws EOFException {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("[")) {
             getToken();
             arrayIndex();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("]")) {
                 getToken();
             }
+            else{
+                //throw new UnexpectedTokenException(token, "]", token.getLine());
+            }
         }
     }
 
-    private void type() {
+    private void type() throws EOFException {
         if (verifyType()) {
             getToken();
         } else if (token.getAttr_name() == Attribute.ID) {
@@ -684,7 +692,7 @@ public class SyntaticAnalyzer {
     }
 
     private boolean hasTokens() {
-        return this.pos < this.tokens.size();
+        return this.tokens.size() > 0;
     }
 
     public void clear() {
@@ -696,10 +704,12 @@ public class SyntaticAnalyzer {
         return token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("float") || token.getLexeme().equals("string") || token.getLexeme().equals("bool") || token.getLexeme().equals("int") || token.getLexeme().equals("void"));
     }
 
-    private void getToken() {
+    private void getToken() throws EOFException {
         System.out.println(token);
         if (hasTokens()) {
-            token = tokens.get(pos++);
+            token = tokens.remove(0);
+        } else {
+            throw new EOFException("Unexpected End of File!");
         }
     }
 
