@@ -22,7 +22,7 @@ public class SyntaticAnalyzer {
         constantDeclaration();
         classDeclaration();
         moreClasses();
-        if(pos == tokens.size()){
+        if (pos == tokens.size()) {
             System.out.println("Success");
         }
     }
@@ -79,7 +79,7 @@ public class SyntaticAnalyzer {
 
     private void classBody() {
         classAtributes();
-        classMethods();
+        methods();
     }
 
     private void classAtributes() {
@@ -140,7 +140,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void classMethods() {
+    private void methods() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("method")) {
             methodDeclaration();
         }
@@ -211,12 +211,12 @@ public class SyntaticAnalyzer {
             if (token.getAttr_name() == Attribute.ID) {
                 getToken();
                 arrayVerification();
-                attr();
+                attribute();
             }
         } else if (token.getAttr_name() == Attribute.ID) {
             getToken();
             arrayVerification();
-            attr();
+            attribute();
             verif();
         }
     }
@@ -232,18 +232,18 @@ public class SyntaticAnalyzer {
     private void complement() {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
             getToken();
-            param();
+            parameter();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(")")) {
                 getToken();
             }
         }
     }
 
-    private void param() {
+    private void parameter() {
         if (token.getAttr_name() == Attribute.STRING) {
             getToken();
             moreParam();
-        }else if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("true") || token.getLexeme().equals("false"))) {
+        } else if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("true") || token.getLexeme().equals("false"))) {
             expression();
             moreParam();
         } else if (token.getAttr_name() == Attribute.LOGICAL_OP && token.getLexeme().equals("!")) {
@@ -261,7 +261,7 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void param2() {
+    private void parameter2() {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
             complement();
         }
@@ -278,7 +278,7 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.STRING) {
             getToken();
             moreParam();
-        }else if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("true") || token.getLexeme().equals("false"))) {
+        } else if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("true") || token.getLexeme().equals("false"))) {
             expression();
             moreParam();
         } else if (token.getAttr_name() == Attribute.LOGICAL_OP && token.getLexeme().equals("!")) {
@@ -345,17 +345,17 @@ public class SyntaticAnalyzer {
 
     private void addExp() {
         multExp();
-        d();
+        plusOrMinus();
     }
 
-    private void d() {
+    private void plusOrMinus() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("+") || token.getLexeme().equals("-"))) {
             getToken();
             addExp();
         }
     }
 
-    private void e() {
+    private void timesOrDivide() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("*") || token.getLexeme().equals("/"))) {
             getToken();
             multExp();
@@ -364,55 +364,48 @@ public class SyntaticAnalyzer {
 
     private void multExp() {
         negExp();
-        e();
+        timesOrDivide();
     }
-    
-    private void negExp(){
-        if(token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("-") || token.getLexeme().equals("++")||token.getLexeme().equals("--"))){
+
+    private void negExp() {
+        if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("-") || token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
             getToken();
             expValue();
-        }
-        else if(token.getAttr_name() == Attribute.LOGICAL_OP && token.getLexeme().equals("!")){
+        } else if (token.getAttr_name() == Attribute.LOGICAL_OP && token.getLexeme().equals("!")) {
             getToken();
             expValue();
-        }
-        else if(token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID){
+        } else if (token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID) {
             expValue();
-            g();
-        }
-        else if(token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("true") || token.getLexeme().equals("false"))){
+            incrementAndDecrement();
+        } else if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("true") || token.getLexeme().equals("false"))) {
             expValue();
-            g();
-        }
-        else if(token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")){
+            incrementAndDecrement();
+        } else if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
             expValue();
-            g();
+            incrementAndDecrement();
         }
     }
-    
-    private void expValue(){
-        if(token.getAttr_name() == Attribute.NUMBER){
+
+    private void expValue() {
+        if (token.getAttr_name() == Attribute.NUMBER) {
             getToken();
-        }
-        else if(token.getAttr_name() == Attribute.ID){
+        } else if (token.getAttr_name() == Attribute.ID) {
             getToken();
             arrayVerification();
-            attr();
-            param2();
-        }
-        else if(token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("true") || token.getLexeme().equals("false"))){
+            attribute();
+            parameter2();
+        } else if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("true") || token.getLexeme().equals("false"))) {
             getToken();
-        }
-        else if(token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")){
+        } else if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
             getToken();
             expression();
-            if(token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(")")){
+            if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(")")) {
                 getToken();
             }
         }
     }
-    
-    private void g(){
+
+    private void incrementAndDecrement() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
             getToken();
         }
@@ -444,7 +437,7 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.ID) {
             getToken();
             arrayVerification();
-            attr();
+            attribute();
             moreWritings();
         } else if (token.getAttr_name() == Attribute.STRING) {
             getToken();
@@ -479,7 +472,7 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.ID) {
             getToken();
             arrayVerification();
-            attr();
+            attribute();
             moreReadings();
         }
     }
@@ -491,13 +484,13 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void attr() {
+    private void attribute() {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(".")) {
             getToken();
             if (token.getAttr_name() == Attribute.ID) {
                 getToken();
                 arrayVerification();
-                attr();
+                attribute();
             }
         }
     }
@@ -538,8 +531,14 @@ public class SyntaticAnalyzer {
                             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("}")) {
                                 getToken();
                                 elseStatement();
+                            } else {
+                                System.out.println("Expected: \"}\"");
+                                System.out.println("Found: " + token.getLexeme());
                             }
                         }
+                    } else {
+                        System.out.println("Expected: \"then\"");
+                        System.out.println("Found: " + token.getLexeme());
                     }
                 }
             }
@@ -579,19 +578,15 @@ public class SyntaticAnalyzer {
     }
 
     private void variable() {
-        if (verifyType()) {
+        if (verifyType() || token.getAttr_name() == Attribute.ID) {
             getToken();
-            variable2();
+            name();
+            moreVariables();
         }
     }
 
-    private void variable2() {
-        name();
-        moreVariables();
-    }
-
     private void moreVariables() {
-        if (verifyType()) {
+        if (verifyType() || token.getAttr_name() == Attribute.ID) {
             variable();
         }
     }
@@ -608,8 +603,7 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
             getToken();
             name();
-        }
-        else if(token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(";")){
+        } else if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(";")) {
             getToken();
         }
     }
@@ -621,7 +615,7 @@ public class SyntaticAnalyzer {
     }
 
     private void parameterDeclaration2() {
-        if (verifyType()|| token.getAttr_name() == Attribute.ID) {
+        if (verifyType() || token.getAttr_name() == Attribute.ID) {
             getToken();
             if (token.getAttr_name() == Attribute.ID) {
                 getToken();
@@ -642,7 +636,7 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.ID) {
             getToken();
             arrayVerification();
-        } else if(token.getAttr_name() == Attribute.STRING || token.getAttr_name() == Attribute.NUMBER || token.getLexeme().equals("true") || token.getLexeme().equals("false")){
+        } else if (token.getAttr_name() == Attribute.STRING || token.getAttr_name() == Attribute.NUMBER || token.getLexeme().equals("true") || token.getLexeme().equals("false")) {
             value();
         }
     }
@@ -664,9 +658,9 @@ public class SyntaticAnalyzer {
             }
         }
     }
-    
-    private void arrayIndex(){
-        if(token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID){
+
+    private void arrayIndex() {
+        if (token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID) {
             getToken();
         }
     }
@@ -684,8 +678,7 @@ public class SyntaticAnalyzer {
     private void type() {
         if (verifyType()) {
             getToken();
-        }
-        else if(token.getAttr_name() == Attribute.ID){
+        } else if (token.getAttr_name() == Attribute.ID) {
             getToken();
         }
     }

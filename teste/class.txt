@@ -1,25 +1,9 @@
-const{
-	int a = -50;
-	float b = 15.784;
-	bool c = true;
-	string d = "batata";
-}
-class almir{
-	method int testaMetodo(int b, float d, ClasseQualquer batata){
-		if(c > j)then{
-			return xorica;
-		}
-		while(true){
-
-		}
-	}
-}
-class netp extends test{
-	variables{
-		int teste, b, c,d,e,f, p;
-		float testadnv;
-
-		int b[50];
-		float c[a][q];
-	}
+class a{
+    method int a(){
+        if(c>j)then{
+            return a;
+            while(true){
+            }
+        }
+    }
 }
