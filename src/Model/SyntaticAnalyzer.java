@@ -695,11 +695,6 @@ public class SyntaticAnalyzer {
         return this.tokens.size() > 0;
     }
 
-    public void clear() {
-        this.tokens.clear();
-        this.pos = 0;
-    }
-
     private boolean verifyType() {
         return token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("float") || token.getLexeme().equals("string") || token.getLexeme().equals("bool") || token.getLexeme().equals("int") || token.getLexeme().equals("void"));
     }
