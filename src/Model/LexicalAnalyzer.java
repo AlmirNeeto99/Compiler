@@ -43,7 +43,7 @@ public class LexicalAnalyzer {
         ArrayList<ArrayList<Token>> ret = new ArrayList<>(2);
         ret.add(tokens);
         ret.add(errors);
-        writeDataOut(file.getName());
+        //writeDataOut(file.getName());
         return ret;
     }
 

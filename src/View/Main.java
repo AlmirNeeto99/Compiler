@@ -18,13 +18,15 @@ public class Main {
             System.out.println("> There's no directory called \"teste\".");
         } else {
             /* Run the algorithm for all '.txt' in teste directory*/
-            for (File files : dir.listFiles()) {
-                if (files.getName().endsWith(".txt")) {
-                    ArrayList<ArrayList<Token>> ret = lexical.start(files);
+            for (File file : dir.listFiles()) {
+                if (file.getName().endsWith(".txt")) {
+                    ArrayList<ArrayList<Token>> ret = lexical.start(file);
                     ArrayList<Token> tokens = ret.get(0);
                     ArrayList<Token> errors = ret.get(1);
                     if(errors.isEmpty()){
                         syntatic.analyze(tokens);
+                        syntatic.writeOutput(file);
+                        syntatic.clear();
                     }
                     lexical.clear();
                 }
