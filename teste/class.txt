@@ -1,7 +1,5 @@
+const{
+	int a = 4;
+}
 class a{
-    method int a(){
-        if(c>j)then{
-            return a;
-        }
-    }
 }

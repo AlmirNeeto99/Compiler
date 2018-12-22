@@ -16,7 +16,7 @@ public class LexicalAnalyzer {
 
     private ArrayList<Token> tokens;
     private ArrayList<Token> errors;
-    private ReservedWords reserved_words;
+    private final ReservedWords reserved_words;
 
     private boolean state = true;
     private boolean isComment = false;
@@ -24,7 +24,7 @@ public class LexicalAnalyzer {
     private boolean isString = false;
     private String lexeme = "";
 
-    private HashSet<Character> delimiters;
+    private final HashSet<Character> delimiters;
     private final HashSet<Integer> symbols = AlphabetSet.getSymbols();
     private final HashSet<Integer> letters = AlphabetSet.getLetters();
     private final HashSet<Integer> numbers = AlphabetSet.getNumbers();
@@ -96,7 +96,6 @@ public class LexicalAnalyzer {
     }
 
     private void classify(String token, int line) {
-
         int position = 0;
         IdAutomaton id = new IdAutomaton();
         NumberAutomaton number = new NumberAutomaton();
