@@ -4,10 +4,11 @@ import Model.AlphabetSet;
 import Model.State;
 import java.util.HashSet;
 
-public class NumberAutomaton extends AlphabetSet{
+public class NumberAutomaton{
     
     private State actual_state;
     private final HashSet<Integer> validNumbers;
+    private final AlphabetSet alpha = new AlphabetSet();
     private final int minus = (int) '-';
     private final int dot = (int)'.';
     private final State[] states = new State[5];
@@ -17,8 +18,7 @@ public class NumberAutomaton extends AlphabetSet{
     private int transitions;
     
     public NumberAutomaton(){
-        super();
-        this.validNumbers = AlphabetSet.getNumbers();
+        this.validNumbers = alpha.getNumbers();
         this.states[0] = new State("q0", false);
         this.states[1] = new State("q1", false);
         this.states[2] = new State("q2", true);

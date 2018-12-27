@@ -4,9 +4,10 @@ import Model.AlphabetSet;
 import Model.State;
 import java.util.HashSet;
 
-public class IdAutomaton extends AlphabetSet{
+public class IdAutomaton{
 
     private State actual_state;
+    private final AlphabetSet alpha = new AlphabetSet();
     private final HashSet<Integer> validLetters;
     private final HashSet<Integer> validNumbers;
     private final int underLine = (int) '_';
@@ -17,9 +18,8 @@ public class IdAutomaton extends AlphabetSet{
     
 
     public IdAutomaton() {
-        super();
-        this.validLetters = AlphabetSet.getLetters();
-        this.validNumbers = AlphabetSet.getNumbers();
+        this.validLetters = alpha.getLetters();
+        this.validNumbers = alpha.getNumbers();
         this.states[0] = new State("q0", false);
         this.states[1] = new State("q1", true);
         this.actual_state = states[0];

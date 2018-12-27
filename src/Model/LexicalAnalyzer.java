@@ -14,8 +14,8 @@ import java.util.HashSet;
 
 public class LexicalAnalyzer {
 
-    private ArrayList<Token> tokens;
-    private ArrayList<Token> errors;
+    private final ArrayList<Token> tokens;
+    private final ArrayList<Token> errors;
     private final ReservedWords reserved_words;
 
     private boolean state = true;
@@ -25,11 +25,15 @@ public class LexicalAnalyzer {
     private String lexeme = "";
 
     private final HashSet<Character> delimiters;
-    private final HashSet<Integer> symbols = AlphabetSet.getSymbols();
-    private final HashSet<Integer> letters = AlphabetSet.getLetters();
-    private final HashSet<Integer> numbers = AlphabetSet.getNumbers();
+    private final HashSet<Integer> symbols;
+    private final HashSet<Integer> letters;
+    private final HashSet<Integer> numbers;
 
     public LexicalAnalyzer() {
+        AlphabetSet alpha = new AlphabetSet();
+        symbols = alpha.getSymbols();
+        letters = alpha.getLetters();
+        numbers = alpha.getNumbers();
         tokens = new ArrayList();
         errors = new ArrayList();
         reserved_words = new ReservedWords();
@@ -89,7 +93,6 @@ public class LexicalAnalyzer {
             Token comment_t = new Token("", Attribute.COMMENT_WITHOUT_END, actualLine);
             errors.add(comment_t);
         }
-        actualLine = 1;
         isString = false;
         isComment = false;
         isBlockComment = false;
@@ -97,14 +100,7 @@ public class LexicalAnalyzer {
 
     private void classify(String token, int line) {
         int position = 0;
-        IdAutomaton id = new IdAutomaton();
-        NumberAutomaton number = new NumberAutomaton();
-
-        boolean isId = false;
-        boolean isNumber = false;
-        boolean negativeNumber = false;
         boolean isBadFormedString = false;
-
         do {
             char actualChar = token.charAt(position);
             if (isBlockComment) {
@@ -141,7 +137,7 @@ public class LexicalAnalyzer {
                         state = false;
                     } else {
                         lexeme = lexeme.trim();
-                        lexeme = "\""+lexeme+"\"";
+                        lexeme = "\"" + lexeme + "\"";
                         changes.setAttr_name(Attribute.STRING);
                         changes.setLexeme(lexeme);
                         isString = false;
@@ -168,384 +164,267 @@ public class LexicalAnalyzer {
             } else if (isComment) { //Ignore all character until the end of the line.
                 position++;
             } else {
-                /* Every case verify if there's something before it.
-                If there's something, create a token with it and starts classifying.
-                Otherwise, classify.*/
-                switch (actualChar) {
-                    /*ARITHMETHIC OPERATORS*/
-                    case '+':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                            lexeme = "";
+                if (letters.contains((int) actualChar)) {
+                    boolean validId = true;
+                    do {
+                        if (delimiters.contains(actualChar) || isRelational(actualChar)
+                                || isLogical(actualChar) || isArithmetic(actualChar) || actualChar == '!') {
+                            break;
                         }
-                        if (hasNext(token, position)) {
-                            char nextChar = token.charAt(position + 1);
-                            if (nextChar == '+') {
-                                createToken(actualChar + "" + nextChar, line, "ARIT.OP");
-                                position += 2;
-                            } else {
-                                createToken(actualChar + "", line, "ARIT.OP");
-                                position++;
-                            }
+                        if (letters.contains((int) actualChar) || numbers.contains((int) actualChar) || actualChar == '_') {
+                            lexeme = lexeme + actualChar;
                         } else {
-                            createToken(actualChar + "", line, "ARIT.OP");
+                            state = false;
+                            validId = false;
+                            lexeme = lexeme + actualChar;
+                        }
+                        if (position + 1 < token.length()) {
+                            actualChar = token.charAt(++position);
+                        } else {
                             position++;
                         }
-                        break;
-                    case '*':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                            lexeme = "";
-                        }
-                        createToken(actualChar + "", line, "ARIT.OP");
-                        position++;
-                        break;
-                    case '-':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
+                    } while (position < token.length());
+                    if (validId) {
+                        if (isReservedWord(lexeme)) {
+                            createToken(lexeme, line, "RESERVED_WORD");
                             lexeme = "";
                         } else {
-                            Token previous = null;
-                            if (tokens.size() > 0) {
-                                previous = tokens.get(tokens.size() - 1);
+                            createToken(lexeme, line, "ID");
+                            lexeme = "";
+                        }
+                    } else {
+                        state = false;
+                        createToken(lexeme, line, "BAD_ID_FORMATION");
+                        lexeme = "";
+                    }
+                } else if (numbers.contains((int) actualChar)) {
+                    boolean validNumber = true;
+                    boolean dot = false;
+                    do {
+                        if (delimitersWithoutDot(actualChar) || isRelational(actualChar)
+                                || isLogical(actualChar) || isArithmetic(actualChar) || actualChar == '!') {
+                            break;
+                        }
+                        if (numbers.contains((int) actualChar) || actualChar == '.') {
+                            if (actualChar == '.') {
+                                if (!dot) {
+                                    dot = true;
+                                } else {
+                                    validNumber = false;
+                                }
                             }
+                            lexeme = lexeme + actualChar;
+                        } else {
+                            state = false;
+                            validNumber = false;
+                            lexeme = lexeme + actualChar;
+                        }
+                        if (position + 1 < token.length()) {
+                            actualChar = token.charAt(++position);
+                        } else {
+                            position++;
+                        }
+                    } while (position < token.length());
+                    if (validNumber) {
+                        Token prev = null;
+                        if (tokens.size() > 0) {
+                            prev = tokens.get(tokens.size() - 1);
+                            if (prev.getLexeme().equals("-") && prev.getLine() == line) {
+                                tokens.remove(tokens.size() - 1);
+                                createToken("-" + lexeme, line, "NUMBER");
+                            } else {
+                                createToken(lexeme, line, "NUMBER");
+                            }
+                            lexeme = "";
+                        }
+                    } else {
+                        state = false;
+                        createToken(lexeme, line, "BAD_NUMBER_FORMATION");
+                        lexeme = "";
+                    }
+                } else {
+                    switch (actualChar) {
+                        case '+': {
+                            if (hasNext(token, position)) {
+                                char nextChar = token.charAt(position + 1);
+                                if (nextChar == '+') {
+                                    createToken("++", line, "ARIT.OP");
+                                    position += 2;
+                                } else {
+                                    createToken("+", line, "ARIT.OP");
+                                    position += 1;
+                                }
+                            } else {
+                                createToken("+", line, "ARIT.OP");
+                                position += 1;
+                            }
+                            break;
+                        }
+                        case '-': {
                             if (hasNext(token, position)) {
                                 char nextChar = token.charAt(position + 1);
                                 if (nextChar == '-') {
-                                    createToken(actualChar + "" + nextChar, line, "ARIT.OP");
+                                    createToken("--", line, "ARIT.OP");
                                     position += 2;
-                                } else if (numbers.contains((int) nextChar)) {
-                                    negativeNumber = true;
-                                    lexeme = lexeme + actualChar + nextChar;
-                                    position += 2;
-                                    number.testChar(actualChar);
-                                    number.testChar(nextChar);
-                                    isNumber = number.canBeValid();
-                                    id.testChar(actualChar);
-                                    id.testChar(nextChar);
-                                    isId = id.canBeValid();
                                 } else {
-                                    createToken(actualChar + "", line, "ARIT.OP");
-                                    position++;
+                                    createToken("-", line, "ARIT.OP");
+                                    position += 1;
                                 }
                             } else {
-                                if (previous != null) {
-                                    if (previous.getAttr_name() == Attribute.ID || previous.getAttr_name() == Attribute.NUMBER || previous.getAttr_name() == Attribute.BAD_ID_FORMATION || previous.getAttr_name() == Attribute.BAD_NUMBER_FORMATION) {
-                                        createToken(actualChar + "", line, "ARIT.OP");
+                                createToken("-", line, "ARIT.OP");
+                                position += 1;
+                            }
+                            break;
+                        }
+                        case '*': {
+                            createToken("*", line, "ARIT.OP");
+                            position += 1;
+                            break;
+                        }
+                        case '/': {
+                            if (hasNext(token, position)) {
+                                char nextChar = token.charAt(position + 1);
+                                switch (nextChar) {
+                                    case '*':
+                                        position += 2;
+                                        isBlockComment = true;
+                                        break;
+                                    case '/':
+                                        isComment = true;
+                                        position += 2;
+                                        break;
+                                    default:
+                                        createToken("/", line, "ARIT.OP");
                                         position++;
-                                    } else {
-                                        lexeme = "-";
-                                        number.testChar(actualChar);
-                                        isNumber = number.canBeValid();
-                                        negativeNumber = true;
-                                        position++;
-                                        id.testChar(actualChar);
-                                        isId = id.canBeValid();
-                                    }
-                                } else {
-                                    lexeme = "-";
-                                    number.testChar(actualChar);
-                                    isNumber = number.canBeValid();
-                                    negativeNumber = true;
-                                    position++;
-                                    id.testChar(actualChar);
-                                    isId = id.canBeValid();
+                                        break;
                                 }
+                            } else {
+                                createToken("/", line, "ARIT.OP");
+                                position++;
                             }
+                            break;
                         }
-                        break;
-                    /*LOGICAL OPERATORS*/
-                    case '/':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                            lexeme = "";
-                        }
-                        if (hasNext(token, position)) {
-                            char nextChar = token.charAt(position + 1);
-                            switch (nextChar) {
-                                case '*':
+                        case '!': {
+                            if (hasNext(token, position)) {
+                                char nextChar = token.charAt(position + 1);
+                                if (nextChar == '=') {
                                     position += 2;
-                                    isBlockComment = true;
-                                    break;
-                                case '/':
-                                    isComment = true;
-                                    position += 2;
-                                    break;
-                                default:
-                                    createToken(actualChar + "", line, "ARIT.OP");
+                                    createToken("!=", line, "REL.OP");
+                                } else {
                                     position++;
-                                    break;
+                                    createToken("!", line, "LOGICAL.OP");
+                                }
+                            } else {
+                                createToken("!", line, "LOGICAL.OP");
+                                position++;
                             }
-                        } else {
-                            createToken(actualChar + "", line, "ARIT.OP");
-                            position++;
+                            break;
                         }
-                        break;
-                    case '!':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                            lexeme = "";
-                        }
-                        if (hasNext(token, position)) {
-                            char nextChar = token.charAt(position + 1);
-                            if (nextChar == '=') {
-                                position += 2;
-                                createToken(actualChar + "" + nextChar, line, "REL.OP");
+                        case '&': {
+                            if (hasNext(token, position)) {
+                                char nextChar = token.charAt(position + 1);
+                                if (nextChar == '&') {
+                                    position += 2;
+                                    createToken("&&", line, "LOGICAL.OP");
+                                } else {
+                                    position++;
+                                    createToken("&", line, "BAD_LOGICAL_OP");
+                                    state = false;
+                                }
                             } else {
                                 position++;
-                                createToken(actualChar + "", line, "LOGICAL.OP");
-                            }
-                        } else {
-                            createToken(actualChar + "", line, "LOGICAL.OP");
-                            position++;
-                        }
-                        break;
-                    case '&':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                            lexeme = "";
-                        }
-                        if (hasNext(token, position)) {
-                            char nextChar = token.charAt(position + 1);
-                            if (nextChar == '&') {
-                                position += 2;
-                                createToken(actualChar + "" + nextChar, line, "LOGICAL.OP");
-                            } else {
-                                position++;
-                                createToken(actualChar + "", line, "BAD_LOGICAL_OP");
+                                createToken("&", line, "BAD_LOGICAL_OP");
                                 state = false;
-
                             }
-                        } else {
-                            position++;
-                            createToken(actualChar + "", line, "BAD_LOGICAL_OP");
-                            state = false;
-
+                            break;
                         }
-                        break;
-                    /*RELATIONAL OPERATORS*/
-                    case '|':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                            lexeme = "";
-                        }
-                        if (hasNext(token, position)) {
-                            char nextChar = token.charAt(position + 1);
-                            if (nextChar == '|') {
-                                position += 2;
-                                createToken(actualChar + "" + nextChar, line, "REL.OP");
-                            } else {
-                                position++;
-                                createToken(actualChar + "", line, "BAD_RELATIONAL_OP");
-                                state = false;
-
-                            }
-                        } else {
-                            position++;
-                            createToken(actualChar + "", line, "BAD_RELATIONAL_OP");
-                            state = false;
-
-                        }
-                        break;
-                    case '<':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                            lexeme = "";
-                        }
-                        if (hasNext(token, position)) {
-                            char nextChar = token.charAt(position + 1);
-                            if (nextChar == '=') {
-                                position += 2;
-                                createToken(actualChar + "" + nextChar, line, "REL.OP");
-                            } else {
-                                createToken(actualChar + "", line, "REL.OP");
-                                position++;
-                            }
-                        } else {
-                            position++;
-                            createToken(actualChar + "", line, "REL.OP");
-                        }
-                        break;
-                    case '>':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                            lexeme = "";
-                        }
-                        if (hasNext(token, position)) {
-                            char nextChar = token.charAt(position + 1);
-                            if (nextChar == '=') {
-                                position += 2;
-                                createToken(actualChar + "" + nextChar, line, "REL.OP");
-                            } else {
-                                createToken(actualChar + "", line, "REL.OP");
-                                position++;
-                            }
-                        } else {
-                            position++;
-                            createToken(actualChar + "", line, "REL.OP");
-                        }
-                        break;
-                    case '=':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                            lexeme = "";
-                        }
-                        if (hasNext(token, position)) {
-                            char nextChar = token.charAt(position + 1);
-                            if (nextChar == '=') {
-                                position += 2;
-                                createToken(actualChar + "" + nextChar, line, "REL.OP");
-                            } else {
-                                createToken(actualChar + "", line, "REL.OP");
-                                position++;
-                            }
-                        } else {
-                            position++;
-                            createToken(actualChar + "", line, "REL.OP");
-                        }
-                        break;
-                    // String started.
-                    case '\"':
-                        if (lexeme.length() > 0) {
-                            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                        }
-                        lexeme = "";
-                        isString = true;
-                        createToken(lexeme, line, "NULL");
-                        position++;
-                        break;
-                    default:
-                        if (delimiters.contains(actualChar)) {
-                            if (lexeme.length() > 0) {
-                                if (negativeNumber) {
-                                    if (isNumber) {
-                                        if (actualChar == '.') {
-                                            lexeme = lexeme + '.';
-                                            position++;
-                                            number.testChar(actualChar);
-                                            isNumber = number.canBeValid();
-                                            negativeNumber = number.canBeValid();
-                                        } else {
-                                            createToken(lexeme, line, "NUMBER");
-                                            lexeme = "";
-                                            isNumber = false;
-                                            negativeNumber = false;
-                                            createToken(actualChar + "", line, "DELIMITER");
-                                            position++;
-                                            number.reset();
-                                            id.reset();
-                                        }
-                                    } else {
-                                        createToken(lexeme, line, "BAD_NUMBER_FORMATION");
-                                        lexeme = "";
-                                        createToken(actualChar + "", line, "DELIMITER");
-                                        position++;
-                                        isNumber = false;
-                                        negativeNumber = false;
-                                        number.reset();
-                                        id.reset();
-                                    }
-                                } else if (isId) {
-                                    if (isReservedWord(lexeme)) {
-                                        createToken(lexeme, line, "RESERVED_WORD");
-                                        lexeme = "";
-                                        isId = false;
-                                        createToken(actualChar + "", line, "DELIMITER");
-                                        position++;
-                                        id.reset();
-                                        number.reset();
-                                    } else {
-                                        createToken(lexeme, line, "ID");
-                                        lexeme = "";
-                                        isId = false;
-                                        createToken(actualChar + "", line, "DELIMITER");
-                                        position++;
-                                        id.reset();
-                                        number.reset();
-                                    }
-                                } else if (isNumber) {
-                                    if (actualChar == '.') {
-                                        lexeme = lexeme + '.';
-                                        position++;
-                                        number.testChar(actualChar);
-                                        isNumber = number.canBeValid();
-                                    } else {
-                                        createToken(lexeme, line, "NUMBER");
-                                        lexeme = "";
-                                        isNumber = false;
-                                        createToken(actualChar + "", line, "DELIMITER");
-                                        position++;
-                                        number.reset();
-                                        id.reset();
-                                    }
+                        case '|': {
+                            if (hasNext(token, position)) {
+                                char nextChar = token.charAt(position + 1);
+                                if (nextChar == '|') {
+                                    position += 2;
+                                    createToken("||", line, "LOGICAL.OP");
                                 } else {
-                                    if (id.transition() > number.transitions()) {
-                                        createToken(lexeme, line, "BAD_ID_FORMATION");
-                                        state = false;
-                                        lexeme = "";
-                                        createToken(actualChar + "", line, "DELIMITER");
-                                        position++;
-                                        number.reset();
-                                        id.reset();
-                                    } else if (id.transition() < number.transitions()) {
-                                        createToken(lexeme, line, "BAD_NUMBER_FORMATION");
-
-                                        state = false;
-                                        lexeme = "";
-                                        createToken(actualChar + "", line, "DELIMITER");
-                                        position++;
-                                        number.reset();
-                                        id.reset();
-                                    } else {
-                                        createToken(lexeme, line, "BAD_FORMATION");
-                                        state = false;
-                                        lexeme = "";
-                                        createToken(actualChar + "", line, "DELIMITER");
-                                        position++;
-                                        number.reset();
-                                        id.reset();
-                                    }
+                                    position++;
+                                    createToken("|", line, "BAD_LOGICAL_OP");
+                                    state = false;
                                 }
                             } else {
-                                createToken(actualChar + "", line, "DELIMITER");
                                 position++;
-                                number.reset();
-                                id.reset();
+                                createToken("|", line, "BAD_LOGICAL_OP");
+                                state = false;
                             }
-                        } else {
-                            id.testChar(actualChar);
-                            isId = id.canBeValid();
-                            number.testChar(actualChar);
-                            isNumber = number.canBeValid();
-                            position++;
-                            lexeme = lexeme + actualChar;
+                            break;
                         }
-                        break;
+                        case '<': {
+                            if (hasNext(token, position)) {
+                                char nextChar = token.charAt(position + 1);
+                                if (nextChar == '=') {
+                                    position += 2;
+                                    createToken("<=", line, "REL.OP");
+                                } else {
+                                    createToken("<", line, "REL.OP");
+                                    position++;
+                                }
+                            } else {
+                                position++;
+                                createToken("<", line, "REL.OP");
+                            }
+                            break;
+                        }
+                        case '>':
+                            if (hasNext(token, position)) {
+                                char nextChar = token.charAt(position + 1);
+                                if (nextChar == '=') {
+                                    position += 2;
+                                    createToken(">=", line, "REL.OP");
+                                } else {
+                                    createToken(">", line, "REL.OP");
+                                    position++;
+                                }
+                            } else {
+                                position++;
+                                createToken(">", line, "REL.OP");
+                            }
+                            break;
+                        case '=':
+                            if (hasNext(token, position)) {
+                                char nextChar = token.charAt(position + 1);
+                                if (nextChar == '=') {
+                                    position += 2;
+                                    createToken("==", line, "REL.OP");
+                                } else {
+                                    createToken("=", line, "REL.OP");
+                                    position++;
+                                }
+                            } else {
+                                position++;
+                                createToken("=", line, "REL.OP");
+                            }
+                            break;
+                        // String started.
+                        case '\"':
+                            lexeme = "";
+                            isString = true;
+                            createToken(lexeme, line, "NULL");
+                            position++;
+                            break;
+                        default: {
+                            if (delimiters.contains(actualChar)) {
+                                createToken("" + actualChar, line, "DELIMITER");
+                                position++;
+                            }
+                            break;
+                        }
+                    }
                 }
             }
         } while (position < token.length());
-        if (negativeNumber) {
-            if (lexeme.length() == 1) {
-                createToken(lexeme, line, "ARIT.OP");
-                lexeme = "";
-                number.reset();
-                id.reset();
-            } else if (lexeme.length() > 1) {
-                classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-                lexeme = "";
-            }
-        } /*If the lexeme isn't a String or a Comment or a Block comment
-        The lexeme will be classyfied analyzing the number of transitions in each automaton.*/ else if (!isString && !isComment && !isBlockComment) {
-            classifyPreviousLexeme(lexeme, line, isId, isNumber, id, number);
-            lexeme = "";
-        }
     }
-
     /*Verify if there's more char after actualChar*/
     private boolean hasNext(String text, int nextPosition) {
         return nextPosition + 1 < text.length();
     }
-
     /*Create a token and put it in List.*/
     private void createToken(String lexeme, int line, String tokenType) {
         if (lexeme.length() > 0) {
@@ -621,42 +500,24 @@ public class LexicalAnalyzer {
         }
     }
 
+    private boolean delimitersWithoutDot(char c) {
+        return c == ';' || c == ',' || c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}';
+    }
+
     private boolean isReservedWord(String word) {
         return reserved_words.isReservedWord(word);
     }
 
-    private void classifyPreviousLexeme(String lexeme, int line, boolean isId, boolean isNumber, IdAutomaton id, NumberAutomaton number) {
-        if (isId) {
-            if (isReservedWord(lexeme)) {
-                createToken(lexeme, line, "RESERVED_WORD");
-                isId = false;
-            } else {
-                createToken(lexeme, line, "ID");
-                isId = false;
-            }
-        } else if (isNumber) {
-            if (number.getActualState().isFinal()) {
-                createToken(lexeme, line, "NUMBER");
-            } else {
-                createToken(lexeme, line, "BAD_NUMBER_FORMATION");
-                state = false;
-            }
-        } else {
-            if (id.transition() > number.transitions()) {
-                createToken(lexeme, line, "BAD_ID_FORMATION");
-                state = false;
-            } else if (id.transition() < number.transitions()) {
-                createToken(lexeme, line, "BAD_NUMBER_FORMATION");
-                state = false;
-            } else {
-                if (lexeme.length() > 0) {
-                    createToken(lexeme, line, "BAD_FORMATION");
-                    state = false;
-                }
-            }
-        }
-        id.reset();
-        number.reset();
+    private boolean isArithmetic(char c) {
+        return c == '+' || c == '-' || c == '*' || c == '/';
+    }
+
+    private boolean isRelational(char c) {
+        return c == '=' || c == '<' || c == '>';
+    }
+
+    private boolean isLogical(char c) {
+        return c == '&' || c == '|';
     }
 
     public void writeDataOut(String entry_name) throws IOException {

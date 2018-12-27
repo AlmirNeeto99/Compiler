@@ -2,7 +2,7 @@ package Model;
 
 import java.util.HashSet;
 
-public abstract class AlphabetSet {
+public class AlphabetSet {
 
     private static final HashSet<Integer> letters = new HashSet();
     private static final HashSet<Integer> numbers = new HashSet();
@@ -26,15 +26,15 @@ public abstract class AlphabetSet {
         }
     }
 
-    public static HashSet<Integer> getLetters() {
+    public HashSet<Integer> getLetters() {
         return letters;
     }
 
-    public static HashSet<Integer> getNumbers() {
+    public HashSet<Integer> getNumbers() {
         return numbers;
     }
 
-    public static HashSet<Integer> getSymbols() {
+    public HashSet<Integer> getSymbols() {
         return symbols;
     } 
 }

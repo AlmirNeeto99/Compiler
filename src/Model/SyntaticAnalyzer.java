@@ -209,13 +209,13 @@ public class SyntaticAnalyzer {
             }
         }
     }
-
+    
     private void newDeclaration() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("float") || token.getLexeme().equals("string") || token.getLexeme().equals("bool") || token.getLexeme().equals("int"))) {
             constants();
         }
     }
-
+    
     /*Verify if the attribution is correct*/
     private void constantAttribution() {
         if (token.getAttr_name() == Attribute.ID) {
@@ -233,7 +233,7 @@ public class SyntaticAnalyzer {
             }
         }
     }
-
+    
     private void value() {
         if (token.getAttr_name() == Attribute.STRING || token.getAttr_name() == Attribute.NUMBER || token.getLexeme().equals("true") || token.getLexeme().equals("false")) {
             getToken();
@@ -246,18 +246,18 @@ public class SyntaticAnalyzer {
             }
         }
     }
-
+    
     private void methods() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("method")) {
             methodDeclaration();
         }
     }
-
+    
     private void methodDeclaration() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("method")) {
             getToken();
             type();
-            if (token.getAttr_name() == Attribute.ID) {
+            if (token.getAttr_name() == Attribute.ID || token.getLexeme().equals("main")) {
                 getToken();
                 if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) { //OKAY
                     getToken();
@@ -446,7 +446,7 @@ public class SyntaticAnalyzer {
             }
         }
     }
-
+    
     private void commands() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("if")) {
             ifStatement();
@@ -491,7 +491,7 @@ public class SyntaticAnalyzer {
             commands();
         }
     }
-
+    
     private void attribution() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
             increment();
@@ -514,7 +514,7 @@ public class SyntaticAnalyzer {
             verif();
         }
     }
-
+    
     private void verif() {
         if (token.getAttr_name() == Attribute.REL_OP && token.getLexeme().equals("=")) {
             normalAttribution2();
@@ -1346,13 +1346,16 @@ public class SyntaticAnalyzer {
     }
 
     private void variable() {
-        if (verifyType() || token.getAttr_name() == Attribute.ID) {
+        if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("float") || 
+                token.getLexeme().equals("int") || token.getLexeme().equals("bool") ||
+                token.getLexeme().equals("string")) 
+                || token.getAttr_name() == Attribute.ID) {
             getToken();
             name();
             moreVariables();
         } else {
             isValid = false;
-            String er = "Expected Token: 'IDENTIFIER | int | string | bool | void | float' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
+            String er = "Expected Token: 'IDENTIFIER | int | string | bool | float' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
             errors.add(er);
             while ((!token.getLexeme().equals("method") && !token.getLexeme().equals("class") && !token.getLexeme().equals("}")) && !EOF) {
                 getToken();
@@ -1472,8 +1475,13 @@ public class SyntaticAnalyzer {
     }
 
     private void arrayIndex() {
-        if (token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID) {
-            getToken();
+        if (token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID ||
+                token.getLexeme().equals("true") || token.getLexeme().equals("false") || 
+                (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--")
+                || token.getLexeme().equals("+") || token.getLexeme().equals("-"))) ||
+                (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) ||
+                (token.getAttr_name() == Attribute.LOGICAL_OP && token.getLexeme().equals("!"))) {
+            addExp();
         } else {
             isValid = false;
             String er = "Expected Token: 'IDENTIFIER or NUMBER' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
@@ -1547,7 +1555,7 @@ public class SyntaticAnalyzer {
                 bw.write("-> Success on Parsing File!!!");
             } else {
                 if (!EOF) {
-                    errors.add("-> Unexpected End of File!!!\n-> There are unalized tokens!\n-> Check if are exceeded '}'\n");
+                    errors.add("-> Unexpected End of File!!!\n-> There are unalized tokens!\n-> Check if are exceeded '}'");
                 }
                 bw.write("-> Error on Parsing File!!!\n");
                 for (String s : errors) {
