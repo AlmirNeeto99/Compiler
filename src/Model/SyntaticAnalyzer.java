@@ -5,8 +5,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.Arrays;
 
 public class SyntaticAnalyzer {
 
@@ -18,10 +17,13 @@ public class SyntaticAnalyzer {
 
     private boolean isValid = true;
     private boolean EOF = false;
-    private HashMap<String, List<String[]>> table = new HashMap();
+    private ArrayList<ClassTable> table = new ArrayList();
+    private ArrayList<String[]> constants = new ArrayList();
 
-    private int constTablePos = 0;
-    private boolean inConsts = false;
+    private boolean inConst = false;
+    private boolean inMethod = false;
+
+    private String exp = "";
 
     public SyntaticAnalyzer() {
         this.pos = 0;
@@ -37,11 +39,13 @@ public class SyntaticAnalyzer {
         constantDeclaration();
         classDeclaration();
         moreClasses();
+        System.out.println(Arrays.toString(table.get(0).getVariables().getVariables().get(3)));
     }
 
     /* This method identify a Constant Block*/
     private void constantDeclaration() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("const")) {
+            inConst = true;
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) { //OKAY
                 getToken();
@@ -60,8 +64,9 @@ public class SyntaticAnalyzer {
                     getToken();
                 }
             }
+            verifyConstantsTypes();
         }
-        inConsts = false;
+        inConst = false;
     }
 
     private void classDeclaration() {
@@ -81,6 +86,13 @@ public class SyntaticAnalyzer {
     /* This method identify a class*/
     private void classIdentification() {
         if (token.getAttr_name() == Attribute.ID) {
+            ClassTable classe = new ClassTable(token.getLexeme());
+            if (table.contains(classe)) {
+                errors.add("There's already a class named '" + "' at Line: " + token.getLine());
+                isValid = false;
+            } else {
+                table.add(classe);
+            }
             getToken();
             classHeritage();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) {
@@ -105,7 +117,6 @@ public class SyntaticAnalyzer {
             isValid = false;
             String er = "Expected Token: 'IDENTIFIER' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
             errors.add(er);
-            classHeritage();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) {
                 getToken();
                 classBody();
@@ -132,6 +143,13 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("extends")) {
             getToken();
             if (token.getAttr_name() == Attribute.ID) {
+                ClassTable heritage = new ClassTable(token.getLexeme());
+                if (table.contains(heritage)) {
+                    table.get(table.size() - 1).setHeritage(token.getLexeme());
+                } else {
+                    errors.add("There's no class named '" + token.getLexeme() + "' at Line: " + token.getLine());
+                    isValid = false;
+                }
                 getToken();
             } else {
                 isValid = false;
@@ -177,9 +195,12 @@ public class SyntaticAnalyzer {
     /*Verify if at least one constant was declared */
     private void constants() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("float") || token.getLexeme().equals("string") || token.getLexeme().equals("bool") || token.getLexeme().equals("int"))) {
+            String[] attr = new String[3];
+            attr[0] = token.getLexeme();
+            constants.add(attr);
             getToken();
-            constantAttribution();
-            moreConstants();
+            constantAttribution(attr);
+            moreConstants(attr);
         } else { //If no constant was declared it go to the next class.
             isValid = false;
             String er = "Expected Token: 'float | int | string | bool' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
@@ -191,14 +212,16 @@ public class SyntaticAnalyzer {
     }
 
     /*Verify if there are more constants in one line or if it's over.*/
-    private void moreConstants() {
+    private void moreConstants(String[] attr) {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
+            String[] attr2 = new String[3];
+            attr2[0] = attr[0];
+            constants.add(attr2);
             getToken();
-            constantAttribution();
-            moreConstants();
+            constantAttribution(attr2);
+            moreConstants(attr2);
         } else if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(";")) {
             getToken();
-            constTablePos++;
             newDeclaration();
         } else {
             isValid = false;
@@ -209,20 +232,29 @@ public class SyntaticAnalyzer {
             }
         }
     }
-    
+
     private void newDeclaration() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("float") || token.getLexeme().equals("string") || token.getLexeme().equals("bool") || token.getLexeme().equals("int"))) {
             constants();
         }
     }
-    
+
     /*Verify if the attribution is correct*/
-    private void constantAttribution() {
+    private void constantAttribution(String[] attr) {
         if (token.getAttr_name() == Attribute.ID) {
+            for (String[] s : constants) {
+                if (s[1] != null) {
+                    if (s[1].equals(token.getLexeme())) {
+                        isValid = false;
+                        errors.add("There's already a constant named: '" + token.getLexeme() + "' at Line: " + token.getLine());
+                    }
+                }
+            }
+            attr[1] = token.getLexeme();
             getToken();
             if (token.getLexeme().equals("=")) {
                 getToken();
-                value();
+                value(attr);
             } else {
                 isValid = false;
                 String er = "Expected Token: '=' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
@@ -233,9 +265,12 @@ public class SyntaticAnalyzer {
             }
         }
     }
-    
-    private void value() {
+
+    private void value(String attr[]) {
         if (token.getAttr_name() == Attribute.STRING || token.getAttr_name() == Attribute.NUMBER || token.getLexeme().equals("true") || token.getLexeme().equals("false")) {
+            if (inConst) {
+                attr[2] = token.getLexeme();
+            }
             getToken();
         } else {
             isValid = false;
@@ -246,15 +281,16 @@ public class SyntaticAnalyzer {
             }
         }
     }
-    
+
     private void methods() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("method")) {
             methodDeclaration();
         }
     }
-    
+
     private void methodDeclaration() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("method")) {
+            inMethod = true;
             getToken();
             type();
             if (token.getAttr_name() == Attribute.ID || token.getLexeme().equals("main")) {
@@ -446,7 +482,7 @@ public class SyntaticAnalyzer {
             }
         }
     }
-    
+
     private void commands() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("if")) {
             ifStatement();
@@ -491,7 +527,7 @@ public class SyntaticAnalyzer {
             commands();
         }
     }
-    
+
     private void attribution() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
             increment();
@@ -514,7 +550,7 @@ public class SyntaticAnalyzer {
             verif();
         }
     }
-    
+
     private void verif() {
         if (token.getAttr_name() == Attribute.REL_OP && token.getLexeme().equals("=")) {
             normalAttribution2();
@@ -659,6 +695,7 @@ public class SyntaticAnalyzer {
 
     private void plusOrMinus() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("+") || token.getLexeme().equals("-"))) {
+            exp = exp + token.getLexeme();
             getToken();
             addExp();
         }
@@ -666,6 +703,7 @@ public class SyntaticAnalyzer {
 
     private void timesOrDivide() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("*") || token.getLexeme().equals("/"))) {
+            exp = exp + token.getLexeme();
             getToken();
             multExp();
         }
@@ -678,9 +716,11 @@ public class SyntaticAnalyzer {
 
     private void negExp() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("-") || token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
+            exp = exp + token.getLexeme();
             getToken();
             expValue();
         } else if (token.getAttr_name() == Attribute.LOGICAL_OP && token.getLexeme().equals("!")) {
+            exp = exp + token.getLexeme();
             getToken();
             expValue();
         } else if (token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID) {
@@ -700,6 +740,7 @@ public class SyntaticAnalyzer {
     }
 
     private void expValue() {
+        exp = exp + token.getLexeme();
         if (token.getAttr_name() == Attribute.NUMBER) {
             getToken();
         } else if (token.getAttr_name() == Attribute.ID) {
@@ -724,12 +765,14 @@ public class SyntaticAnalyzer {
 
     private void incrementAndDecrement() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
+            exp = exp + token.getLexeme();
             getToken();
         }
     }
 
     private void increment() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
+            exp = exp + token.getLexeme();
             getToken();
         }
     }
@@ -1346,10 +1389,21 @@ public class SyntaticAnalyzer {
     }
 
     private void variable() {
-        if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("float") || 
-                token.getLexeme().equals("int") || token.getLexeme().equals("bool") ||
-                token.getLexeme().equals("string")) 
+        if (token.getAttr_name() == Attribute.RESERVED_WORD && (token.getLexeme().equals("float")
+                || token.getLexeme().equals("int") || token.getLexeme().equals("bool")
+                || token.getLexeme().equals("string"))
                 || token.getAttr_name() == Attribute.ID) {
+            VariableTable actual;
+            if (inMethod) {
+                ClassTable c = table.get(table.size() - 1);
+                MethodTable m = c.getMethods().get(c.getMethods().size() - 1);
+                actual = m.getVariables();
+            } else {
+                actual = table.get(table.size() - 1).getVariables();
+            }
+            String[] attr = new String[4];
+            attr[0] = token.getLexeme();
+            actual.getVariables().add(attr);
             getToken();
             name();
             moreVariables();
@@ -1371,8 +1425,19 @@ public class SyntaticAnalyzer {
 
     private void name() {
         if (token.getAttr_name() == Attribute.ID) {
+            VariableTable actual;
+            if (inMethod) {
+                ClassTable c = table.get(table.size() - 1);
+                MethodTable m = c.getMethods().get(c.getMethods().size() - 1);
+                actual = m.getVariables();
+            } else {
+                actual = table.get(table.size() - 1).getVariables();
+            }
+            actual.getVariables().get(actual.getVariables().size() - 1)[1] = token.getLexeme();
             getToken();
             arrayVerification();
+            actual.getVariables().get(actual.getVariables().size() - 1)[2] = exp;
+            exp = "";
             moreNames();
         } else {
             isValid = false;
@@ -1387,6 +1452,20 @@ public class SyntaticAnalyzer {
 
     private void moreNames() {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
+            VariableTable actual;
+            String type = "";
+            if (inMethod) {
+                ClassTable c = table.get(table.size() - 1);
+                MethodTable m = c.getMethods().get(c.getMethods().size() - 1);
+                actual = m.getVariables();
+                type = actual.getVariables().get(actual.getVariables().size() - 1)[0];
+            } else {
+                actual = table.get(table.size() - 1).getVariables();
+                type = actual.getVariables().get(actual.getVariables().size() - 1)[0];
+            }
+            String[] attr = new String[4];
+            attr[0] = type;
+            actual.getVariables().add(attr);
             getToken();
             name();
         } else if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(";")) {
@@ -1441,7 +1520,7 @@ public class SyntaticAnalyzer {
             getToken();
             arrayVerification();
         } else if (token.getAttr_name() == Attribute.STRING || token.getAttr_name() == Attribute.NUMBER || token.getLexeme().equals("true") || token.getLexeme().equals("false")) {
-            value();
+            //value();
         } else {
             isValid = false;
             String er = "Expected Token: 'IDENTIFIER or String or 'true' or 'false'' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
@@ -1475,12 +1554,12 @@ public class SyntaticAnalyzer {
     }
 
     private void arrayIndex() {
-        if (token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID ||
-                token.getLexeme().equals("true") || token.getLexeme().equals("false") || 
-                (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--")
-                || token.getLexeme().equals("+") || token.getLexeme().equals("-"))) ||
-                (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) ||
-                (token.getAttr_name() == Attribute.LOGICAL_OP && token.getLexeme().equals("!"))) {
+        if (token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID
+                || token.getLexeme().equals("true") || token.getLexeme().equals("false")
+                || (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--")
+                || token.getLexeme().equals("+") || token.getLexeme().equals("-")))
+                || (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("("))
+                || (token.getAttr_name() == Attribute.LOGICAL_OP && token.getLexeme().equals("!"))) {
             addExp();
         } else {
             isValid = false;
@@ -1547,6 +1626,46 @@ public class SyntaticAnalyzer {
         return token.getAttr_name() == Attribute.REL_OP && (token.getLexeme().equals("!=") || token.getLexeme().equals("==")
                 || token.getLexeme().equals("<") || token.getLexeme().equals(">") || token.getLexeme().equals("=")
                 || token.getLexeme().equals("<=") || token.getLexeme().equals(">="));
+    }
+
+    private void verifyConstantsTypes() {
+        for (String[] s : constants) {
+            String value = s[2];
+            if (s[0].equals("int")) {
+                try {
+                    int test = Integer.parseInt(value);
+                } catch (NumberFormatException e) {
+                    isValid = false;
+                    errors.add("Incompatible type for Constant: '" + s[1] + "', the assigned value isn't an integer.");
+                }
+            } else if (s[0].equals("float")) {
+                if (value.contains(".")) {
+                    try {
+                        float test = Float.parseFloat(value);
+                    } catch (NumberFormatException e) {
+                        isValid = false;
+                        errors.add("Incompatible type for Constant: '" + s[1] + "', the assigned value isn't a float.");
+                    }
+                } else {
+                    isValid = false;
+                    errors.add("Incompatible type for Constant: '" + s[1] + "', the assigned value isn't a float.");
+                }
+            }
+            else if(s[0].equals("bool")){
+                if(value.equals("true") || value.equals("false")){}
+                else{
+                    isValid = false;
+                    errors.add("Incompatible type for Constant: '" + s[1] + "', the assigned value isn't a bool");
+                }
+            }
+            else if(s[0].equals("string")){
+                if(value.startsWith("\"") && value.endsWith("\"")){}
+                else{
+                    isValid = false;
+                    errors.add("Incompatible type for Constant: '" + s[1] + "', the assigned value isn't a string");
+                }
+            }
+        }
     }
 
     public void writeOutput(File file) throws IOException {

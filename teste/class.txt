@@ -1,23 +1,14 @@
-class Classe_Principal {
-    variables { int varTest_1;
-               float varTest_1;}
-    method int methodTest_1 (int varTest_1, int varTest_1){
-    
-    read (varTest_1, varTest_1 [a][a]);
-    
-    if (((a>b)||-3)++) then {} 
-    else{
-        return 2;
-    }
-    if (a--) then {}
-    while (a+b){}
-    
-    metodo(a, b [c++][d]);    
-        return "d";
-    }
-    method void branco(bool d){}
-    
-    method int main (){}
+const {
+    int a = 98, kkj = 50;
+    float b = 98.3, c= 98427415.98, g = 100.98;   
+    bool batata = true, kasjhqw = false;
+    string almir = "true", neto = "wqqw";
 }
 
-class Classe_Principal extends Classe_Principal {}
+class a{
+    variables{
+        int a[40+9], b, porp;
+        float almir;
+        bool batata;
+    }
+}
