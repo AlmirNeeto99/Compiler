@@ -20,10 +20,16 @@ public class SyntaticAnalyzer {
     private ArrayList<ClassTable> table = new ArrayList();
     private ArrayList<String[]> constants = new ArrayList();
 
+    private ArrayList<Token> expression = new ArrayList();
+
     private boolean inConst = false;
     private boolean inMethod = false;
+    private boolean inVariable = false;
+    private boolean hasMain = false;
 
-    private String exp = "";
+    private ClassTable actualClass;
+    private VariableTable actualVariable;
+    private MethodTable actualMethod;
 
     public SyntaticAnalyzer() {
         this.pos = 0;
@@ -39,7 +45,6 @@ public class SyntaticAnalyzer {
         constantDeclaration();
         classDeclaration();
         moreClasses();
-        System.out.println(Arrays.toString(table.get(0).getVariables().getVariables().get(3)));
     }
 
     /* This method identify a Constant Block*/
@@ -88,10 +93,11 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.ID) {
             ClassTable classe = new ClassTable(token.getLexeme());
             if (table.contains(classe)) {
-                errors.add("There's already a class named '" + "' at Line: " + token.getLine());
+                errors.add("There's already a class named '" + token.getLexeme() + "' at Line: " + token.getLine());
                 isValid = false;
             } else {
                 table.add(classe);
+                actualClass = table.get(table.size() - 1);
             }
             getToken();
             classHeritage();
@@ -143,12 +149,29 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("extends")) {
             getToken();
             if (token.getAttr_name() == Attribute.ID) {
-                ClassTable heritage = new ClassTable(token.getLexeme());
-                if (table.contains(heritage)) {
-                    table.get(table.size() - 1).setHeritage(token.getLexeme());
-                } else {
-                    errors.add("There's no class named '" + token.getLexeme() + "' at Line: " + token.getLine());
+                if (actualClass.getName().equals(token.getLexeme())) {
                     isValid = false;
+                    errors.add("A class can't inherit from itself, at Line: " + token.getLine());
+                } else {
+                    ClassTable heritage = new ClassTable(token.getLexeme());
+                    if (table.contains(heritage)) {
+                        actualClass.setHeritage(token.getLexeme());
+                        for (ClassTable c : table) {
+                            if (c.getName().equals(token.getLexeme())) {
+                                ArrayList<String[]> s = c.getVariables().getVariables();
+                                for (String[] a : s) {
+                                    actualClass.getVariables().getVariables().add(a);
+                                }
+                                ArrayList<MethodTable> m = c.getMethods();
+                                for (MethodTable mt : m) {
+                                    actualClass.getMethods().add(mt);
+                                }
+                            }
+                        }
+                    } else {
+                        errors.add("There's no class named '" + token.getLexeme() + "' to be inherited, at Line: " + token.getLine());
+                        isValid = false;
+                    }
                 }
                 getToken();
             } else {
@@ -190,6 +213,7 @@ public class SyntaticAnalyzer {
                 }
             }
         }
+        inVariable = false;
     }
 
     /*Verify if at least one constant was declared */
@@ -292,18 +316,62 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("method")) {
             inMethod = true;
             getToken();
-            type();
+            String type = type();
+            if (!type.equals("void") && !type.equals("int") && !type.equals("float") && !type.equals("bool") && !type.equals("string")) {
+                ClassTable c = new ClassTable(type);
+                if (!table.contains(c)) {
+                    isValid = false;
+                    errors.add("There's no class named: '" + type + "' to be returned by the method.");
+                }
+            }
             if (token.getAttr_name() == Attribute.ID || token.getLexeme().equals("main")) {
+                if (token.getLexeme().equals("main")) {
+                    if (hasMain) {
+                        isValid = false;
+                        errors.add("There can exist only one 'main' method, at Line: " + token.getLine());
+                    }
+                    hasMain = true;
+                }
+                MethodTable m = new MethodTable();
+                m.setName(token.getLexeme());
+                m.setType(type);
+                actualMethod = m;
                 getToken();
                 if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) { //OKAY
                     getToken();
-                    parameterDeclaration();
+                    parameterDeclaration(m);
+                    boolean equals = false;
+                    for (MethodTable mt : actualClass.getMethods()) {
+                        if (mt.getParameters().size() == m.getParameters().size()) {
+                            ArrayList<String[]> a = mt.getParameters();
+                            ArrayList<String[]> b = m.getParameters();
+                            for (int control = 0; control < a.size(); control++) {
+                                String[] mtParam = a.get(control);
+                                String[] mParam = b.get(control);
+                                if (mtParam[0].equals(mParam[0]) && mtParam[2].equals(mParam[2])) {
+                                    equals = true;
+                                } else {
+                                    equals = false;
+                                }
+                            }
+                        }
+                    }
+                    if (!equals) {
+                        actualClass.getMethods().add(m);
+                    } else {
+                        isValid = false;
+                        errors.add("There's already a method named: '" + m.getName() + "' with the same parameters, at Class: '" + actualClass.getName() + "'");
+                    }
                     if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(")")) { //OKAY
                         getToken();
                         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) { //OKAY
                             getToken();
                             variableDeclaration();
                             commands();
+                            if (!actualMethod.getType().equals("void") && actualMethod.getReturns().isEmpty()) {
+                                isValid = false;
+                                errors.add("Method '" + actualMethod.getName() + "' has no valid return command, at class: '" + actualClass.getName() + "'.");
+                            }
                             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("}")) { //OKAY
                                 getToken();
                                 moreMethods();
@@ -367,7 +435,7 @@ public class SyntaticAnalyzer {
                     isValid = false;
                     String er = "Expected Token: '(' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
                     errors.add(er);
-                    parameterDeclaration();
+                    parameterDeclaration(new MethodTable());
                     if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(")")) { //OKAY
                         getToken();
                         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) { //OKAY
@@ -440,7 +508,7 @@ public class SyntaticAnalyzer {
                 errors.add(er);
                 if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
                     getToken();
-                    parameterDeclaration();
+                    parameterDeclaration(new MethodTable());
                     if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(")")) {
                         getToken();
                         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) {
@@ -481,6 +549,7 @@ public class SyntaticAnalyzer {
                 }
             }
         }
+        inMethod = false;
     }
 
     private void commands() {
@@ -531,10 +600,89 @@ public class SyntaticAnalyzer {
     private void attribution() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
             increment();
+            expression.clear();
+            ArrayList<String> attr = new ArrayList();
             if (token.getAttr_name() == Attribute.ID) {
+                attr.add(token.getLexeme());
+                String[] a = new String[3];
+                a[1] = token.getLexeme();
+                a[2] = "null";
                 getToken();
-                arrayVerification();
-                attribute();
+                arrayVerification(a);
+                boolean matches = false;
+                for (String[] s : actualMethod.getVariables().getVariables()) {
+                    if (s[1].equals(a[1])) {
+                        matches = true;
+                        if (s[2].equals(a[2])) {
+                        } else {
+                            matches = true;
+                            isValid = false;
+                            if (s[2].equals("array")) {
+                                errors.add("Variable '" + a[1] + "' at method Variables, is an array. Line: " + token.getLine());
+                            } else if (s[2].equals("matrix")) {
+                                errors.add("Variable '" + a[1] + "' at method Variables, is a matrix. Line: " + token.getLine());
+                            } else {
+                                errors.add("Variable '" + a[1] + "' at method Variables, is neither an array nor a matrix. Line: " + token.getLine());
+                            }
+                        }
+                    }
+                }
+                if (!matches) {
+                    for (String[] s : actualMethod.getParameters()) {
+                        if (s[1].equals(a[1])) {
+                            if (s[2].equals(a[2])) {
+                                matches = true;
+                            } else {
+                                matches = true;
+                                isValid = false;
+                                if (s[2].equals("array")) {
+                                    errors.add("Variable '" + a[1] + "' at method parameters, is an array. Line: " + token.getLine());
+                                } else if (s[2].equals("matrix")) {
+                                    errors.add("Variable '" + a[1] + "' at method parameters, is a matrix. Line: " + token.getLine());
+                                } else {
+                                    errors.add("Variable '" + a[1] + "' at method parameters, is neither an array nor a matrix. Line: " + token.getLine());
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!matches) {
+                    for (String[] s : actualClass.getVariables().getVariables()) {
+                        if (s[1].equals(a[1])) {
+                            if (s[2].equals(a[2])) {
+                                matches = true;
+                            } else {
+                                matches = true;
+                                isValid = false;
+                                if (s[2].equals("array")) {
+                                    errors.add("Variable '" + a[1] + "' at class variables, is an array. Line: " + token.getLine());
+                                } else if (s[2].equals("matrix")) {
+                                    errors.add("Variable '" + a[1] + "' at class variables, is a matrix. Line: " + token.getLine());
+                                } else {
+                                    errors.add("Variable '" + a[1] + "' at class variables, is neither an array nor a matrix. Line: " + token.getLine());
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!matches) {
+                    for (String[] s : constants) {
+                        if (s[1].equals(a[1])) {
+                            matches = true;
+                            isValid = false;
+                            errors.add("You can't increment or decrement a constant");
+                        }
+                    }
+                }
+                if (!matches) {
+                    isValid = false;
+                    errors.add("There's no variables called: '" + a[1] + "', at Line:" + token.getLine());
+                }
+                attribute(attr);
+                boolean object = false;
+                if (attr.size() > 0) {
+                    String s = attr.get(attr.size() - 1);
+                }
             } else {
                 isValid = false;
                 String er = "Expected Token: 'IDENTIFIER' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
@@ -544,21 +692,82 @@ public class SyntaticAnalyzer {
                 }
             }
         } else if (token.getAttr_name() == Attribute.ID) {
+            ArrayList<String> attr = new ArrayList();
+            attr.add(token.getLexeme());
+            String[] a = new String[3];
+            a[1] = token.getLexeme();
+            a[2] = "null";
             getToken();
-            arrayVerification();
-            attribute();
+            arrayVerification(a);
+            boolean matches = false;
+            for (String[] s : actualMethod.getVariables().getVariables()) {
+                if (s[1].equals(a[1])) {
+                    matches = true;
+                    if (s[2].equals(a[2])) {
+                    } else {
+                        matches = true;
+                        isValid = false;
+                        if (s[2].equals("array")) {
+                            errors.add("Variable '" + a[1] + "' at method Variables, is an array. Line: " + token.getLine());
+                        } else if (s[2].equals("matrix")) {
+                            errors.add("Variable '" + a[1] + "' at method Variables, is a matrix. Line: " + token.getLine());
+                        } else {
+                            errors.add("Variable '" + a[1] + "' at method Variables, is neither an array nor a matrix. Line: " + token.getLine());
+                        }
+                    }
+                }
+            }
+            if (!matches) {
+                for (String[] s : actualMethod.getParameters()) {
+                    if (s[1].equals(a[1])) {
+                        if (s[2].equals(a[2])) {
+                            matches = true;
+                        } else {
+                            matches = true;
+                            isValid = false;
+                            if (s[2].equals("array")) {
+                                errors.add("Variable '" + a[1] + "' at method parameters, is an array. Line: " + token.getLine());
+                            } else if (s[2].equals("matrix")) {
+                                errors.add("Variable '" + a[1] + "' at method parameters, is a matrix. Line: " + token.getLine());
+                            } else {
+                                errors.add("Variable '" + a[1] + "' at method parameters, is neither an array nor a matrix. Line: " + token.getLine());
+                            }
+                        }
+                    }
+                }
+            }
+            if (!matches) {
+                for (String[] s : actualClass.getVariables().getVariables()) {
+                    if (s[1].equals(a[1])) {
+                        if (s[2].equals(a[2])) {
+                            matches = true;
+                        } else {
+                            matches = true;
+                            isValid = false;
+                            if (s[2].equals("array")) {
+                                errors.add("Variable '" + a[1] + "' at class variables, is an array. Line: " + token.getLine());
+                            } else if (s[2].equals("matrix")) {
+                                errors.add("Variable '" + a[1] + "' at class variables, is a matrix. Line: " + token.getLine());
+                            } else {
+                                errors.add("Variable '" + a[1] + "' at class variables, is neither an array nor a matrix. Line: " + token.getLine());
+                            }
+                        }
+                    }
+                }
+            }
+            attribute(attr);
             verif();
         }
     }
 
     private void verif() {
-        if (token.getAttr_name() == Attribute.REL_OP && token.getLexeme().equals("=")) {
+        if ((token.getAttr_name() == Attribute.REL_OP && token.getLexeme().equals("=")) || (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--")))) {
             normalAttribution2();
         } else if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
             complement();
         } else {
             isValid = false;
-            String er = "Expected Token: '= or (' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
+            String er = "Expected Token: '= or ( or ++ or --' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
             errors.add(er);
             while (!token.getLexeme().equals(";") && !EOF) {
                 getToken();
@@ -695,7 +904,7 @@ public class SyntaticAnalyzer {
 
     private void plusOrMinus() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("+") || token.getLexeme().equals("-"))) {
-            exp = exp + token.getLexeme();
+            expression.add(token);
             getToken();
             addExp();
         }
@@ -703,7 +912,7 @@ public class SyntaticAnalyzer {
 
     private void timesOrDivide() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("*") || token.getLexeme().equals("/"))) {
-            exp = exp + token.getLexeme();
+            expression.add(token);
             getToken();
             multExp();
         }
@@ -716,11 +925,11 @@ public class SyntaticAnalyzer {
 
     private void negExp() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("-") || token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
-            exp = exp + token.getLexeme();
+            expression.add(token);
             getToken();
             expValue();
         } else if (token.getAttr_name() == Attribute.LOGICAL_OP && token.getLexeme().equals("!")) {
-            exp = exp + token.getLexeme();
+            expression.add(token);
             getToken();
             expValue();
         } else if (token.getAttr_name() == Attribute.NUMBER || token.getAttr_name() == Attribute.ID) {
@@ -740,7 +949,7 @@ public class SyntaticAnalyzer {
     }
 
     private void expValue() {
-        exp = exp + token.getLexeme();
+        expression.add(token);
         if (token.getAttr_name() == Attribute.NUMBER) {
             getToken();
         } else if (token.getAttr_name() == Attribute.ID) {
@@ -765,14 +974,14 @@ public class SyntaticAnalyzer {
 
     private void incrementAndDecrement() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
-            exp = exp + token.getLexeme();
+            expression.add(token);
             getToken();
         }
     }
 
     private void increment() {
         if (token.getAttr_name() == Attribute.ARIT_OP && (token.getLexeme().equals("++") || token.getLexeme().equals("--"))) {
-            exp = exp + token.getLexeme();
+            expression.add(token);
             getToken();
         }
     }
@@ -949,12 +1158,88 @@ public class SyntaticAnalyzer {
         }
     }
 
+    private void attribute(ArrayList<String> attr) {
+        if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(".")) {
+            getToken();
+            if (token.getAttr_name() == Attribute.ID) {
+                attr.add(token.getLexeme());
+                String[] a = new String[3];
+                a[1] = token.getLexeme();
+                a[2] = "null";
+                getToken();
+                arrayVerification(a);
+                boolean matches = false;
+                for (String[] s : actualMethod.getVariables().getVariables()) {
+                    if (s[1].equals(a[1])) {
+                        matches = true;
+                        if (s[2].equals(a[2])) {
+                        } else {
+                            matches = true;
+                            isValid = false;
+                            if (s[2].equals("array")) {
+                                errors.add("Variable '" + a[1] + "' at method Variables, is an array. Line: " + token.getLine());
+                            } else if (s[2].equals("matrix")) {
+                                errors.add("Variable '" + a[1] + "' at method Variables, is a matrix. Line: " + token.getLine());
+                            } else {
+                                errors.add("Variable '" + a[1] + "' at method Variables, is neither an array nor a matrix. Line: " + token.getLine());
+                            }
+                        }
+                    }
+                }
+                if (!matches) {
+                    for (String[] s : actualMethod.getParameters()) {
+                        if (s[1].equals(a[1])) {
+                            if (s[2].equals(a[2])) {
+                                matches = true;
+                            } else {
+                                matches = true;
+                                isValid = false;
+                                if (s[2].equals("array")) {
+                                    errors.add("Variable '" + a[1] + "' at method parameters, is an array. Line: " + token.getLine());
+                                } else if (s[2].equals("matrix")) {
+                                    errors.add("Variable '" + a[1] + "' at method parameters, is a matrix. Line: " + token.getLine());
+                                } else {
+                                    errors.add("Variable '" + a[1] + "' at method parameters, is neither an array nor a matrix. Line: " + token.getLine());
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!matches) {
+                    for (String[] s : actualClass.getVariables().getVariables()) {
+                        if (s[1].equals(a[1])) {
+                            if (s[2].equals(a[2])) {
+                                matches = true;
+                            } else {
+                                matches = true;
+                                isValid = false;
+                                if (s[2].equals("array")) {
+                                    errors.add("Variable '" + a[1] + "' at class variables, is an array. Line: " + token.getLine());
+                                } else if (s[2].equals("matrix")) {
+                                    errors.add("Variable '" + a[1] + "' at class variables, is a matrix. Line: " + token.getLine());
+                                } else {
+                                    errors.add("Variable '" + a[1] + "' at class variables, is neither an array nor a matrix. Line: " + token.getLine());
+                                }
+                            }
+                        }
+                    }
+                }
+                attribute(attr);
+            } else {
+                isValid = false;
+                String er = "Expected Token: 'IDENTIFIER' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
+                errors.add(er);
+            }
+        }
+    }
+
     private void whileStatement() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("while")) {
             getToken();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
                 getToken();
                 expression();
+                checkIfExpressionIsBoolean();
                 if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(")")) {
                     getToken();
                     if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("{")) { //Okay
@@ -1088,6 +1373,7 @@ public class SyntaticAnalyzer {
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("(")) {
                 getToken();
                 expression();
+                checkIfExpressionIsBoolean();
                 if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(")")) {
                     getToken();
                     if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("then")) {
@@ -1393,20 +1679,45 @@ public class SyntaticAnalyzer {
                 || token.getLexeme().equals("int") || token.getLexeme().equals("bool")
                 || token.getLexeme().equals("string"))
                 || token.getAttr_name() == Attribute.ID) {
-            VariableTable actual;
+            inVariable = true;
             if (inMethod) {
-                ClassTable c = table.get(table.size() - 1);
-                MethodTable m = c.getMethods().get(c.getMethods().size() - 1);
-                actual = m.getVariables();
+                MethodTable m = actualClass.getMethods().get(actualClass.getMethods().size() - 1);
+                actualVariable = m.getVariables();
+                if (token.getAttr_name() == Attribute.ID) {
+                    boolean exists = false;
+                    for (ClassTable c : table) {
+                        if (c.getName().equals(token.getLexeme())) {
+                            exists = true;
+                        }
+                    }
+                    if (!exists) {
+                        isValid = false;
+                        errors.add("There's no class named '" + token.getLexeme() + "' at Line: " + token.getLine() + ", to create an object.");
+                    }
+                }
             } else {
-                actual = table.get(table.size() - 1).getVariables();
+                actualVariable = table.get(table.size() - 1).getVariables();
+                if (token.getAttr_name() == Attribute.ID) {
+                    boolean exists = false;
+                    for (ClassTable c : table) {
+                        if (c.getName().equals(token.getLexeme())) {
+                            exists = true;
+                        }
+                    }
+                    if (!exists) {
+                        isValid = false;
+                        errors.add("There's no class named '" + token.getLexeme() + "' at Line: " + token.getLine() + ", to create an object.");
+                    }
+                }
             }
-            String[] attr = new String[4];
+            String[] attr = new String[3];
             attr[0] = token.getLexeme();
-            actual.getVariables().add(attr);
+            attr[2] = "null";
+            actualVariable.getVariables().add(attr);
             getToken();
             name();
             moreVariables();
+            inVariable = false;
         } else {
             isValid = false;
             String er = "Expected Token: 'IDENTIFIER | int | string | bool | float' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
@@ -1425,19 +1736,63 @@ public class SyntaticAnalyzer {
 
     private void name() {
         if (token.getAttr_name() == Attribute.ID) {
-            VariableTable actual;
             if (inMethod) {
-                ClassTable c = table.get(table.size() - 1);
-                MethodTable m = c.getMethods().get(c.getMethods().size() - 1);
-                actual = m.getVariables();
+                MethodTable m = actualClass.getMethods().get(actualClass.getMethods().size() - 1);
+                actualVariable = m.getVariables();
+                boolean error = false;
+                String var = token.getLexeme();
+                for (String[] s : actualVariable.getVariables()) {
+                    if (s[1] != null) {
+                        if (s[1].equals(var)) {
+                            error = true;
+                            isValid = false;
+                            errors.add("There's already a variable called '" + var + "' at Line: " + token.getLine());
+                        }
+                    }
+                }
+                if (!error) {
+                    for (String[] s : actualMethod.getParameters()) {
+                        if (s[1].equals(var)) {
+                            error = true;
+                            isValid = false;
+                            errors.add("There's already a variable called '" + var + "' at method's: '" + actualMethod.getName() + "' parameters.");
+                        }
+                    }
+                }
+                if (!error) {
+                    for (String[] s : constants) {
+                        if (s[1].equals(var)) {
+                            error = true;
+                            isValid = false;
+                            errors.add("There's already a constant called '" + var + "' at method's: '" + actualMethod.getName() + "' variables.");
+                        }
+                    }
+                }
             } else {
-                actual = table.get(table.size() - 1).getVariables();
+                boolean error = false;
+                actualVariable = table.get(table.size() - 1).getVariables();
+                String var = token.getLexeme();
+                for (String[] s : actualVariable.getVariables()) {
+                    if (s[1] != null) {
+                        if (s[1].equals(var)) {
+                            error = true;
+                            isValid = false;
+                            errors.add("There's already a variable called '" + var + "' at Line: " + token.getLine());
+                        }
+                    }
+                }
+                if (!error) {
+                    for (String[] s : constants) {
+                        if (s[1].equals(var)) {
+                            isValid = false;
+                            errors.add("There's already a constant called '" + var + "' at Line: " + token.getLine());
+                        }
+                    }
+                }
             }
-            actual.getVariables().get(actual.getVariables().size() - 1)[1] = token.getLexeme();
+            actualVariable.getVariables().get(actualVariable.getVariables().size() - 1)[1] = token.getLexeme();
             getToken();
-            arrayVerification();
-            actual.getVariables().get(actual.getVariables().size() - 1)[2] = exp;
-            exp = "";
+            arrayVerification(actualVariable.getVariables().get(actualVariable.getVariables().size() - 1));
             moreNames();
         } else {
             isValid = false;
@@ -1452,20 +1807,19 @@ public class SyntaticAnalyzer {
 
     private void moreNames() {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
-            VariableTable actual;
             String type = "";
             if (inMethod) {
-                ClassTable c = table.get(table.size() - 1);
-                MethodTable m = c.getMethods().get(c.getMethods().size() - 1);
-                actual = m.getVariables();
-                type = actual.getVariables().get(actual.getVariables().size() - 1)[0];
+                MethodTable m = actualClass.getMethods().get(actualClass.getMethods().size() - 1);
+                actualVariable = m.getVariables();
+                type = actualVariable.getVariables().get(actualVariable.getVariables().size() - 1)[0];
             } else {
-                actual = table.get(table.size() - 1).getVariables();
-                type = actual.getVariables().get(actual.getVariables().size() - 1)[0];
+                actualVariable = table.get(table.size() - 1).getVariables();
+                type = actualVariable.getVariables().get(actualVariable.getVariables().size() - 1)[0];
             }
-            String[] attr = new String[4];
+            String[] attr = new String[3];
             attr[0] = type;
-            actual.getVariables().add(attr);
+            attr[2] = "null";
+            actualVariable.getVariables().add(attr);
             getToken();
             name();
         } else if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(";")) {
@@ -1480,19 +1834,43 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void parameterDeclaration() {
+    private void parameterDeclaration(MethodTable m) {
         if (verifyType() || token.getAttr_name() == Attribute.ID) {
-            parameterDeclaration2();
+            parameterDeclaration2(m);
         }
     }
 
-    private void parameterDeclaration2() {
+    private void parameterDeclaration2(MethodTable m) {
         if (verifyType() || token.getAttr_name() == Attribute.ID) {
+            if (token.getAttr_name() == Attribute.ID) {
+                boolean exists = false;
+                for (ClassTable c : table) {
+                    if (c.getName().equals(token.getLexeme())) {
+                        exists = true;
+                    }
+                }
+                if (!exists) {
+                    isValid = false;
+                    errors.add("There's no class named '" + token.getLexeme() + "' at method's: '" + m.getName() + "' parameters, at class: '" + actualClass.getName() + "' at Line: " + token.getLine());
+                }
+            }
+            String type = token.getLexeme();
             getToken();
             if (token.getAttr_name() == Attribute.ID) {
+                String name = token.getLexeme();
+                String[] param = new String[3];
+                param[0] = type;
+                param[1] = name;
+                for (String[] p : m.getParameters()) {
+                    if (p[1].equals(name)) {
+                        isValid = false;
+                        errors.add("There's parameters with the same name at method '" + m.getName() + "' at Class: '" + actualClass.getName() + "'");
+                    }
+                }
+                m.getParameters().add(param);
                 getToken();
-                arrayVerification();
-                moreParameters();
+                arrayVerification(m);
+                moreParameters(m);
             } else {
                 isValid = false;
                 String er = "Expected Token: 'IDENTIFIER' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
@@ -1510,6 +1888,10 @@ public class SyntaticAnalyzer {
 
     private void return1() {
         if (token.getAttr_name() == Attribute.RESERVED_WORD && token.getLexeme().equals("return")) {
+            if (actualMethod.getType().equals("void")) {
+                isValid = false;
+                errors.add("Void method '" + actualMethod.getName() + "' has unnacessary return command at class '" + actualClass.getName() + "' at Line " + token.getLine() + ".");
+            }
             getToken();
             return2();
         }
@@ -1517,10 +1899,131 @@ public class SyntaticAnalyzer {
 
     private void return2() {
         if (token.getAttr_name() == Attribute.ID) {
+            boolean matches = false;
+            if (!actualMethod.getType().equals("void")) {
+                for (String[] s : actualMethod.getVariables().getVariables()) {
+                    if (s[1].equals(token.getLexeme())) {
+                        if (s[0].equals(actualMethod.getType())) {
+                            matches = true;
+                        } else {
+                            matches = true;
+                            isValid = false;
+                            errors.add("Variable '" + token.getLexeme() + "', isn't of the same type of its method. Line: " + token.getLine());
+                        }
+                    }
+                }
+                if (!matches) {
+                    for (String[] s : actualMethod.getParameters()) {
+                        if (s[1].equals(token.getLexeme())) {
+                            if (s[0].equals(actualMethod.getType())) {
+                                matches = true;
+                            } else {
+                                matches = true;
+                                isValid = false;
+                                errors.add("Variable '" + token.getLexeme() + "' at method parameter, isn't of the same type of its method. Line: " + token.getLine());
+                            }
+                        }
+                    }
+                }
+                if (!matches) {
+                    for (String[] s : actualClass.getVariables().getVariables()) {
+                        if (s[1].equals(token.getLexeme())) {
+                            if (s[0].equals(actualMethod.getType())) {
+                                matches = true;
+                            } else {
+                                matches = true;
+                                isValid = false;
+                                errors.add("Variable '" + token.getLexeme() + "' at its Class Variables, isn't of the same type of its method. Line: " + token.getLine());
+                            }
+                        }
+                    }
+                }
+                if (!matches) {
+                    for (String[] s : constants) {
+                        if (s[1].equals(token.getLexeme())) {
+                            if (s[0].equals(actualMethod.getType())) {
+                                matches = true;
+                            } else {
+                                matches = true;
+                                isValid = false;
+                                errors.add("Constant '" + token.getLexeme() + "', isn't of the same type of its method. Line: " + token.getLine());
+                            }
+                        }
+                    }
+                }
+                if (!matches) {
+                    isValid = false;
+                    errors.add("There's no variable nor constant named '" + token.getLexeme() + "', at Line: " + token.getLine() + " to be returned.");
+                }
+            }
+            String a[] = new String[3];
+            a[1] = token.getLexeme();
+            a[2] = "null";
             getToken();
-            arrayVerification();
+            arrayVerification(a);
+            if (matches) {
+                matches = false;
+                for (String[] s : actualMethod.getVariables().getVariables()) {
+                    if (s[1].equals(a[1])) {
+                        if (s[2].equals(a[2])) {
+                            actualMethod.getReturns().add(a[1]);
+                            matches = true;
+                        } else {
+                            matches = true;
+                            isValid = false;
+                            if (s[2].equals("array")) {
+                                errors.add("Variable '" + a[1] + "' at method Variables, is an array. Line: " + token.getLine());
+                            } else if (s[2].equals("matrix")) {
+                                errors.add("Variable '" + a[1] + "' at method Variables, is a matrix. Line: " + token.getLine());
+                            } else {
+                                errors.add("Variable '" + a[1] + "' at method Variables, is neither an array nor a matrix. Line: " + token.getLine());
+                            }
+                        }
+                    }
+                }
+                if (!matches) {
+                    for (String[] s : actualMethod.getParameters()) {
+                        if (s[1].equals(a[1])) {
+                            if (s[2].equals(a[2])) {
+                                actualMethod.getReturns().add(a[1]);
+                                matches = true;
+                            } else {
+                                matches = true;
+                                isValid = false;
+                                if (s[2].equals("array")) {
+                                    errors.add("Variable '" + a[1] + "' at method parameters, is an array. Line: " + token.getLine());
+                                } else if (s[2].equals("matrix")) {
+                                    errors.add("Variable '" + a[1] + "' at method parameters, is a matrix. Line: " + token.getLine());
+                                } else {
+                                    errors.add("Variable '" + a[1] + "' at method parameters, is neither an array nor a matrix. Line: " + token.getLine());
+                                }
+                            }
+                        }
+                    }
+                }
+                if (!matches) {
+                    for (String[] s : actualClass.getVariables().getVariables()) {
+                        if (s[1].equals(a[1])) {
+                            if (s[2].equals(a[2])) {
+                                actualMethod.getReturns().add(a[1]);
+                                matches = true;
+                            } else {
+                                matches = true;
+                                isValid = false;
+                                if (s[2].equals("array")) {
+                                    errors.add("Variable '" + a[1] + "' at class variables, is an array. Line: " + token.getLine());
+                                } else if (s[2].equals("matrix")) {
+                                    errors.add("Variable '" + a[1] + "' at class variables, is a matrix. Line: " + token.getLine());
+                                } else {
+                                    errors.add("Variable '" + a[1] + "' at class variables, is neither an array nor a matrix. Line: " + token.getLine());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         } else if (token.getAttr_name() == Attribute.STRING || token.getAttr_name() == Attribute.NUMBER || token.getLexeme().equals("true") || token.getLexeme().equals("false")) {
-            //value();
+            value();
         } else {
             isValid = false;
             String er = "Expected Token: 'IDENTIFIER or String or 'true' or 'false'' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
@@ -1531,10 +2034,62 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void moreParameters() {
+    private void value() {
+        if (token.getAttr_name() == Attribute.STRING || token.getAttr_name() == Attribute.NUMBER || token.getLexeme().equals("true") || token.getLexeme().equals("false")) {
+            if (token.getAttr_name() == Attribute.STRING) {
+                if (!actualMethod.getType().equals("string")) {
+                    isValid = false;
+                    errors.add("Return arguments doesn't match with its method type. Line: " + token.getLine() + ".");
+                } else {
+                    actualMethod.getReturns().add(token.getLexeme());
+                }
+            } else if (token.getLexeme().equals("true") || token.getLexeme().equals("false")) {
+                if (!actualMethod.getType().equals("bool")) {
+                    isValid = false;
+                    errors.add("Return arguments doesn't match with its method type. Line: " + token.getLine() + ".");
+                } else {
+                    actualMethod.getReturns().add(token.getLexeme());
+                }
+            } else if (token.getAttr_name() == Attribute.NUMBER) {
+                String value = token.getLexeme();
+                if (actualMethod.getType().equals("int")) {
+                    try {
+                        int test = Integer.parseInt(value);
+                        actualMethod.getReturns().add(token.getLexeme());
+                    } catch (NumberFormatException e) {
+                        isValid = false;
+                        errors.add("Incompatible type for value: '" + value + "', the returned value isn't an integer. At Line: " + token.getLine());
+                    }
+                } else if (actualMethod.getType().equals("float")) {
+                    if (value.contains(".")) {
+                        try {
+                            float test = Float.parseFloat(value);
+                            actualMethod.getReturns().add(token.getLexeme());
+                        } catch (NumberFormatException e) {
+                            isValid = false;
+                            errors.add("Incompatible type for value: '" + value + "', the returned value isn't a float. At Line: " + token.getLine());
+                        }
+                    } else {
+                        isValid = false;
+                        errors.add("Incompatible type for value: '" + value + "', the returned value isn't a float. At Line: " + token.getLine());
+                    }
+                }
+            }
+            getToken();
+        } else {
+            isValid = false;
+            String er = "Expected Token: 'String or Number or 'true' or 'false'' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
+            errors.add(er);
+            while (!token.getLexeme().equals(";") && !EOF) {
+                getToken();
+            }
+        }
+    }
+
+    private void moreParameters(MethodTable m) {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals(",")) {
             getToken();
-            parameterDeclaration2();
+            parameterDeclaration2(m);
         }
     }
 
@@ -1542,9 +2097,86 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("[")) {
             getToken();
             arrayIndex();
+            verifyArrayExpression();
+            expression.clear();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("]")) {
                 getToken();
                 doubleArray();
+            } else {
+                isValid = false;
+                String er = "Expected Token: ']' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
+                errors.add(er);
+            }
+        }
+    }
+
+    private void arrayVerification(String[] s) {
+        if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("[")) {
+            s[2] = "array";
+            getToken();
+            arrayIndex();
+            verifyArrayExpression();
+            expression.clear();
+            if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("]")) {
+                getToken();
+                doubleArray(s);
+            } else {
+                isValid = false;
+                String er = "Expected Token: ']' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
+                errors.add(er);
+            }
+        }
+    }
+
+    private void doubleArray(String[] s) {
+        if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("[")) {
+            s[2] = "matrix";
+            getToken();
+            arrayIndex();
+            verifyArrayExpression();
+            expression.clear();
+            if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("]")) {
+                getToken();
+            } else {
+                isValid = false;
+                String er = "Expected Token: ']' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
+                errors.add(er);
+            }
+        }
+    }
+
+    private void arrayVerification(MethodTable m) {
+        if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("[")) {
+            String[] s = m.getParameters().get(m.getParameters().size() - 1);
+            s[2] = "array";
+            getToken();
+            arrayIndex();
+            verifyArrayExpression();
+            expression.clear();
+            if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("]")) {
+                getToken();
+                doubleArray(m);
+            } else {
+                isValid = false;
+                String er = "Expected Token: ']' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
+                errors.add(er);
+            }
+        } else {
+            String[] s = m.getParameters().get(m.getParameters().size() - 1);
+            s[2] = "null";
+        }
+    }
+
+    private void doubleArray(MethodTable m) {
+        if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("[")) {
+            String[] s = m.getParameters().get(m.getParameters().size() - 1);
+            s[2] = "matrix";
+            getToken();
+            arrayIndex();
+            verifyArrayExpression();
+            expression.clear();
+            if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("]")) {
+                getToken();
             } else {
                 isValid = false;
                 String er = "Expected Token: ']' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
@@ -1575,6 +2207,8 @@ public class SyntaticAnalyzer {
         if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("[")) {
             getToken();
             arrayIndex();
+            verifyArrayExpression();
+            expression.clear();
             if (token.getAttr_name() == Attribute.DELIMITER && token.getLexeme().equals("]")) {
                 getToken();
             } else {
@@ -1585,16 +2219,21 @@ public class SyntaticAnalyzer {
         }
     }
 
-    private void type() {
+    private String type() {
         if (verifyType()) {
+            String ret = token.getLexeme();
             getToken();
+            return ret;
         } else if (token.getAttr_name() == Attribute.ID) {
+            String ret = token.getLexeme();
             getToken();
+            return ret;
         } else {
             isValid = false;
             String er = "Expected Token: 'IDENTIFIER | string | float | bool | int | void ' -> Received: " + "\'" + token.getLexeme() + "\'" + " at Line: " + token.getLine();
             errors.add(er);
         }
+        return null;
     }
 
     private boolean hasTokens() {
@@ -1608,6 +2247,16 @@ public class SyntaticAnalyzer {
         this.isValid = true;
         this.errors.clear();
         this.token = null;
+        this.table.clear();
+        this.constants.clear();
+        this.actualClass = null;
+        this.actualMethod = null;
+        this.actualVariable = null;
+        this.hasMain = false;
+        this.expression.clear();
+        this.inConst = false;
+        this.inMethod = false;
+        this.inVariable = false;
     }
 
     private boolean verifyType() {
@@ -1650,17 +2299,15 @@ public class SyntaticAnalyzer {
                     isValid = false;
                     errors.add("Incompatible type for Constant: '" + s[1] + "', the assigned value isn't a float.");
                 }
-            }
-            else if(s[0].equals("bool")){
-                if(value.equals("true") || value.equals("false")){}
-                else{
+            } else if (s[0].equals("bool")) {
+                if (value.equals("true") || value.equals("false")) {
+                } else {
                     isValid = false;
                     errors.add("Incompatible type for Constant: '" + s[1] + "', the assigned value isn't a bool");
                 }
-            }
-            else if(s[0].equals("string")){
-                if(value.startsWith("\"") && value.endsWith("\"")){}
-                else{
+            } else if (s[0].equals("string")) {
+                if (value.startsWith("\"") && value.endsWith("\"")) {
+                } else {
                     isValid = false;
                     errors.add("Incompatible type for Constant: '" + s[1] + "', the assigned value isn't a string");
                 }
@@ -1668,8 +2315,91 @@ public class SyntaticAnalyzer {
         }
     }
 
+    private void verifyArrayExpression() {
+        for (Token t : expression) {
+            if (t.getAttr_name() == Attribute.NUMBER) {
+                String lex = t.getLexeme();
+                try {
+                    int test = Integer.parseInt(lex);
+                } catch (NumberFormatException e) {
+                    isValid = false;
+                    errors.add("Invalid expression in Array Argument at Line: " + t.getLine());
+                }
+            } else if (t.getAttr_name() == Attribute.ID) {
+                String var = t.getLexeme();
+                boolean found = false;
+                for (String[] s : constants) {
+                    if (s[1].equals(var)) {
+                        if (!s[0].equals("int")) {
+                            found = true;
+                            isValid = false;
+                            errors.add("Invalid expression in Array Argument at Line: " + t.getLine() + ", variable '" + s[1] + "' isn't integer.");
+                        } else {
+                            found = true;
+                        }
+                    }
+                }
+                if (!found) {
+                    isValid = false;
+                    errors.add("There's no constant called '" + var + "' at Line: " + t.getLine());
+                }
+            } else if ((t.getAttr_name() == Attribute.LOGICAL_OP) || (t.getAttr_name() == Attribute.REL_OP)) {
+                isValid = false;
+                errors.add("Relational and Logical Operator isn't allowed at Array Argument, Line: " + t.getLine());
+            }
+        }
+
+    }
+
+    private void checkIfExpressionIsBoolean() {
+        if (verifyIfAllTokensAreDeclared()) {
+
+        }
+        expression.clear();
+    }
+
+    private boolean verifyIfAllTokensAreDeclared() {
+        boolean exists = false;
+        for (Token t : expression) {
+            if (t.getAttr_name() == Attribute.ID) {
+                String var = t.getLexeme();
+                for (String[] s : actualMethod.getVariables().getVariables()) {
+                    if (s[1].equals(var)) {
+                        exists = true;
+                    }
+                }
+                if (!exists) {
+                    for (String[] s : actualMethod.getParameters()) {
+                        if (s[1].equals(var)) {
+                            exists = true;
+                        }
+                    }
+                }
+                if (!exists) {
+                    for (String[] s : actualClass.getVariables().getVariables()) {
+                        if (s[1].equals(var)) {
+                            exists = true;
+                        }
+                    }
+                }
+                if (!exists) {
+                    for (String[] s : constants) {
+                        if (s[1].equals(var)) {
+                            exists = true;
+                        }
+                    }
+                }
+                if (!exists) {
+                    isValid = false;
+                    errors.add("There's neither variable nor constant declared as: '" + var + "'");
+                }
+            }
+        }
+        return exists;
+    }
+
     public void writeOutput(File file) throws IOException {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(new File("output_" + file.getName())))) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(new File("teste/output_" + file.getName())))) {
             if (isValid && EOF) {
                 bw.write("-> Success on Parsing File!!!");
             } else {

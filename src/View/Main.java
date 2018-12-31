@@ -8,7 +8,7 @@ import java.util.ArrayList;
 public class Main {
 
     private static final LexicalAnalyzer lexical = new LexicalAnalyzer();
-    private static SyntaticAnalyzer syntatic = new SyntaticAnalyzer();
+    private static final SyntaticAnalyzer syntatic = new SyntaticAnalyzer();
 
     public static void main(String[] args) throws IOException {
         /* Try to open 'teste' directory.
